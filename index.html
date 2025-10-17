@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhyme Scheme Analyzer</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --container-bg: #ffffff;
+            --border-color: #e1e5e9;
+            --input-bg: #f8f9fa;
+            --button-bg: #000000;
+            --button-text: #ffffff;
+            --accent-color: #333333;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --container-bg: #111111;
+            --border-color: #333333;
+            --input-bg: #222222;
+            --button-bg: #ffffff;
+            --button-text: #000000;
+            --accent-color: #cccccc;
+            --shadow: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            min-height: 100vh;
+            line-height: 1.6;
+            transition: all 0.3s ease;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 40px;
+        }
+
+        .container {
+            background-color: var(--container-bg);
+            padding: 40px;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            transition: all 0.3s ease;
+        }
+
+        h1 {
+            color: var(--text-color);
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+
+        .theme-toggle {
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            min-width: 120px;
+        }
+
+        .theme-toggle:hover {
+            opacity: 0.8;
+        }
+
+        .input-group {
+            margin-bottom: 30px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 240px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            font-size: 16px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+            resize: vertical;
+            transition: all 0.2s ease;
+            line-height: 1.6;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        textarea::placeholder {
+            color: var(--accent-color);
+            opacity: 0.6;
+        }
+
+        .button-group {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .analyze-btn {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            padding: 16px 32px;
+            border: 1px solid var(--button-bg);
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            letter-spacing: 0.5px;
+        }
+
+        .analyze-btn:hover {
+            opacity: 0.9;
+        }
+
+        .analyze-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .output {
+            margin-top: 40px;
+            padding: 30px;
+            background-color: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        .output h3 {
+            color: var(--text-color);
+            margin-bottom: 30px;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .line {
+            margin-bottom: 20px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+            font-size: 16px;
+            line-height: 1.8;
+            padding: 16px 20px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-left: 3px solid var(--accent-color);
+            border-radius: 8px;
+        }
+
+        .rhyme-group-summary {
+            margin-top: 40px;
+            padding: 30px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        .rhyme-group-summary h4 {
+            color: var(--text-color);
+            margin-bottom: 25px;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .group-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            background-color: var(--container-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .group-item:hover {
+            border-color: var(--accent-color);
+        }
+
+        .group-label {
+            font-weight: 700;
+            font-size: 14px;
+            margin-right: 20px;
+            min-width: 35px;
+            text-align: center;
+            padding: 6px 10px;
+            color: #ffffff;
+            font-family: monospace;
+            border-radius: 6px;
+        }
+
+        .group-words {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 14px;
+            color: var(--text-color);
+            flex: 1;
+        }
+
+        .rhyme-type-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            margin-left: 15px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid;
+            border-radius: 4px;
+        }
+
+        .perfect-rhyme {
+            background-color: #22c55e;
+            color: #ffffff;
+            border-color: #22c55e;
+        }
+
+        .estimated-rhyme {
+            background-color: #f59e0b;
+            color: #ffffff;
+            border-color: #f59e0b;
+        }
+
+        .error {
+            color: #ef4444;
+            background-color: var(--container-bg);
+            border: 1px solid #ef4444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            font-weight: 500;
+        }
+
+        .rhyme-highlight {
+            padding: 3px 6px;
+            font-weight: 700;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            border-radius: 4px;
+        }
+
+        .rhyme-highlight:hover {
+            border-color: var(--text-color);
+        }
+
+        /* Light mode highlighting colors */
+        .rhyme-color-0 { background-color: #C0392B !important; color: #ffffff !important; }
+        .rhyme-color-1 { background-color: #138D75 !important; color: #ffffff !important; }
+        .rhyme-color-2 { background-color: #1F618D !important; color: #ffffff !important; }
+        .rhyme-color-3 { background-color: #27AE60 !important; color: #ffffff !important; }
+        .rhyme-color-4 { background-color: #F39C12 !important; color: #ffffff !important; }
+        .rhyme-color-5 { background-color: #8E44AD !important; color: #ffffff !important; }
+        .rhyme-color-6 { background-color: #16A085 !important; color: #ffffff !important; }
+        .rhyme-color-7 { background-color: #D68910 !important; color: #ffffff !important; }
+        .rhyme-color-8 { background-color: #7D3C98 !important; color: #ffffff !important; }
+        .rhyme-color-9 { background-color: #2E86C1 !important; color: #ffffff !important; }
+        .rhyme-color-10 { background-color: #E67E22 !important; color: #ffffff !important; }
+        .rhyme-color-11 { background-color: #229954 !important; color: #ffffff !important; }
+        .rhyme-color-12 { background-color: #CB4335 !important; color: #ffffff !important; }
+        .rhyme-color-13 { background-color: #2874A6 !important; color: #ffffff !important; }
+        .rhyme-color-14 { background-color: #A569BD !important; color: #ffffff !important; }
+        .rhyme-color-15 { background-color: #148F77 !important; color: #ffffff !important; }
+
+        /* Dark mode highlighting colors - more subtle with better contrast */
+        [data-theme="dark"] .rhyme-color-0 { background-color: #8B2B2B !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-1 { background-color: #0F6B5C !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-2 { background-color: #1A4E73 !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-3 { background-color: #1F8A4C !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-4 { background-color: #C2790F !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-5 { background-color: #6A3487 !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-6 { background-color: #12806A !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-7 { background-color: #A86D0D !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-8 { background-color: #5F2C75 !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-9 { background-color: #256A9A !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-10 { background-color: #B8591C !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-11 { background-color: #1C7542 !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-12 { background-color: #9A342A !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-13 { background-color: #1F5A84 !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-14 { background-color: #824A95 !important; color: #E8E8E8 !important; }
+        [data-theme="dark"] .rhyme-color-15 { background-color: #0F6B5C !important; color: #E8E8E8 !important; }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 15px;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+
+            .container {
+                padding: 25px;
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+
+            textarea {
+                height: 200px;
+                font-size: 14px;
+                padding: 15px;
+            }
+
+            .analyze-btn {
+                padding: 14px 24px;
+                font-size: 14px;
+            }
+
+            .line {
+                font-size: 14px;
+                padding: 12px 15px;
+            }
+
+            .group-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+
+            .group-label {
+                margin-right: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Rhyme Scheme Analyzer</h1>
+        <button class="theme-toggle" onclick="toggleTheme()">Toggle Dark Mode</button>
+    </div>
+
+    <div class="container">
+
+        <div class="input-group">
+            <textarea id="textInput" placeholder="Paste your poem, rap lyrics, or any text here...">Tripping off the beat kinda, dripping off the meat grinder
+Heat niner, pimping, stripping, soft sweet minor
+China was a neat signer, trouble with the script
+The magnificent different president, evident hesitant</textarea>
+        </div>
+
+        <div class="button-group">
+            <button class="analyze-btn" id="analyzeBtn" onclick="analyzeRhymes()">Analyze Rhyme Scheme</button>
+        </div>
+
+        <div id="output" class="output">
+            <h3>Rhyme Analysis Results</h3>
+            <div id="results"></div>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+    </div>
+
+    <script>
+        async function analyzeRhymes() {
+            const text = document.getElementById('textInput').value.trim();
+            const btn = document.getElementById('analyzeBtn');
+            const output = document.getElementById('output');
+            const results = document.getElementById('results');
+            const errorDiv = document.getElementById('error');
+
+            if (!text) {
+                showError('Please enter some text to analyze.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+            output.style.display = 'none';
+            errorDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayResults(data);
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Failed to analyze text. Make sure the Python server is running.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Analyze Rhyme Scheme';
+            }
+        }
+
+        function renderWordWithSyllableHighlights(originalWord, syllableData, rhymeGroups) {
+            // Break down the word into actual syllables and highlight each one individually
+            const syllables = syllableData.syllables;
+
+            if (!syllables || syllables.length === 0) {
+                return originalWord;
+            }
+
+            // For now, use a simple approach to estimate syllable boundaries in the text
+            // This is a simplified syllable splitting - in a production system, you'd want
+            // more sophisticated phoneme-to-text alignment
+            const estimatedSyllables = estimateSyllableBoundaries(originalWord, syllables.length);
+
+            let result = '';
+
+            for (let i = 0; i < syllables.length; i++) {
+                const syllable = syllables[i];
+                const syllableText = estimatedSyllables[i] || '';
+
+                if (syllable.rhyme_group && syllable.color) {
+                    // This syllable is part of a rhyme group - highlight it
+                    const group = rhymeGroups[syllable.rhyme_group];
+
+                    let styleExtra = '';
+                    let titleText = `Rhyme group ${group?.letter || 'Unknown'}`;
+
+                    if (group?.rhyme_type?.includes('slant')) {
+                        styleExtra = 'border: 1px dashed rgba(0,0,0,0.4);';
+                        titleText += ' (slant rhyme)';
+                    } else if (group?.rhyme_type?.includes('strong')) {
+                        titleText += ' (strong rhyme)';
+                    } else if (group?.rhyme_type?.includes('perfect')) {
+                        titleText += ' (perfect rhyme)';
+                    }
+
+                    if (group?.syllable_count > 1) {
+                        titleText += ` - ${group.syllable_count} syllables`;
+                    }
+
+                    result += `<span class="syllable-highlight" style="background-color: ${syllable.color}; color: #000000; padding: 0px 1px; border-radius: 2px; font-weight: bold; ${styleExtra}" title="${titleText}">${syllableText}</span>`;
+                } else {
+                    // Non-rhyming syllable - render normally
+                    result += syllableText;
+                }
+            }
+
+            return result || originalWord; // Fallback to original word if syllable breakdown fails
+        }
+
+        function estimateSyllableBoundaries(word, syllableCount) {
+            // More sophisticated syllable boundary estimation
+            if (syllableCount <= 1) {
+                return [word];
+            }
+
+            // Handle common patterns and prefixes/suffixes
+            const commonPatterns = {
+                // Common endings that form their own syllables
+                'ing': 1, 'tion': 1, 'sion': 1, 'ness': 1, 'ment': 1,
+                'ful': 1, 'less': 1, 'able': 1, 'ible': 1, 'ous': 1,
+                'er': 1, 'est': 1, 'ly': 1, 'ed': 1, 'en': 1
+            };
+
+            // Check for common endings first
+            let endingSyllables = [];
+            let remainingWord = word.toLowerCase();
+
+            for (const [ending, sylCount] of Object.entries(commonPatterns)) {
+                if (remainingWord.endsWith(ending) && remainingWord.length > ending.length) {
+                    endingSyllables.unshift(word.slice(-ending.length));
+                    remainingWord = remainingWord.slice(0, -ending.length);
+                    syllableCount--;
+                    break;
+                }
+            }
+
+            if (syllableCount <= 1) {
+                return [word.slice(0, remainingWord.length), ...endingSyllables];
+            }
+
+            // Find vowel clusters for remaining syllables
+            const vowelClusters = [];
+            const vowelPattern = /[aeiouAEIOU]+/g;
+            let match;
+
+            while ((match = vowelPattern.exec(remainingWord)) !== null) {
+                vowelClusters.push({
+                    start: match.index,
+                    end: match.index + match[0].length,
+                    vowel: match[0]
+                });
+            }
+
+            if (vowelClusters.length <= 1) {
+                return [word.slice(0, remainingWord.length), ...endingSyllables];
+            }
+
+            // More intelligent boundary detection
+            const boundaries = [0];
+
+            for (let i = 0; i < syllableCount - 1 && i < vowelClusters.length - 1; i++) {
+                const currentVowel = vowelClusters[i];
+                const nextVowel = vowelClusters[i + 1];
+
+                // Find consonants between vowels
+                const consonantStart = currentVowel.end;
+                const consonantEnd = nextVowel.start;
+                const consonantLength = consonantEnd - consonantStart;
+
+                let boundary;
+                if (consonantLength === 0) {
+                    // No consonants between vowels
+                    boundary = currentVowel.end;
+                } else if (consonantLength === 1) {
+                    // Single consonant - goes with next syllable
+                    boundary = consonantStart;
+                } else {
+                    // Multiple consonants - split them
+                    boundary = consonantStart + Math.floor(consonantLength / 2);
+                }
+
+                boundaries.push(boundary);
+            }
+
+            boundaries.push(remainingWord.length);
+
+            // Create syllables from boundaries
+            const syllables = [];
+            for (let i = 0; i < boundaries.length - 1; i++) {
+                const syllable = word.substring(boundaries[i], boundaries[i + 1]);
+                if (syllable) {
+                    syllables.push(syllable);
+                }
+            }
+
+            return [...syllables, ...endingSyllables];
+        }
+
+        function displayResults(data) {
+            const results = document.getElementById('results');
+            const output = document.getElementById('output');
+
+            results.innerHTML = '';
+
+            // Update colors based on current theme
+            const themeColors = getThemeColors();
+            const textColor = getTextColor();
+            let colorIndex = 0;
+
+            // Reassign colors to rhyme groups based on current theme
+            for (const group of Object.values(data.rhyme_groups)) {
+                group.color = themeColors[colorIndex % themeColors.length];
+                group.textColor = textColor;
+                colorIndex++;
+            }
+
+            // Display lines with syllable-level highlighting
+            data.lines.forEach((line, lineIndex) => {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'line';
+                lineDiv.style.marginBottom = '15px';
+                lineDiv.style.lineHeight = '1.6';
+
+                const words = line.split(/(\s+)/); // Keep spaces
+                let highlightedLine = '';
+                let currentWordIndex = 0;
+
+                words.forEach(word => {
+                    if (/^\s+$/.test(word)) {
+                        // It's whitespace, keep as is
+                        highlightedLine += word;
+                    } else {
+                        // Find syllable highlights for this word
+                        const wordKey = `${lineIndex}_${currentWordIndex}`;
+                        const syllableData = data.syllable_highlights && data.syllable_highlights[wordKey];
+
+                        if (syllableData && syllableData.syllables) {
+                            // Render word with syllable-level highlighting
+                            highlightedLine += renderWordWithSyllableHighlights(word, syllableData, data.rhyme_groups);
+                        } else {
+                            // No syllable data, render as plain text
+                            highlightedLine += word;
+                        }
+                        currentWordIndex++;
+                    }
+                });
+
+                lineDiv.innerHTML = highlightedLine;
+                results.appendChild(lineDiv);
+            });
+
+            // Add rhyme group summary
+            if (Object.keys(data.rhyme_groups).length > 0) {
+                const summaryDiv = document.createElement('div');
+                summaryDiv.className = 'rhyme-group-summary';
+                summaryDiv.innerHTML = '<h4>Rhyme Groups Found:</h4>';
+
+                Object.values(data.rhyme_groups).forEach(group => {
+                    const groupDiv = document.createElement('div');
+                    groupDiv.className = 'group-item';
+
+                    // Determine rhyme type and styling
+                    let rhymeTypeBadge = '';
+                    let badgeClass = '';
+
+                    if (group.rhyme_type === 'perfect' || group.type === 'phonetic') {
+                        badgeClass = 'perfect-rhyme';
+                        rhymeTypeBadge = 'perfect';
+                    } else if (group.rhyme_type === 'estimated' || group.type === 'text_based') {
+                        badgeClass = 'estimated-rhyme';
+                        rhymeTypeBadge = 'estimated';
+                    } else if (group.rhyme_type === 'mixed') {
+                        badgeClass = 'estimated-rhyme';
+                        rhymeTypeBadge = 'mixed';
+                    } else if (group.type === 'multisyllabic') {
+                        badgeClass = 'perfect-rhyme';
+                        rhymeTypeBadge = 'multisyllabic';
+                    }
+
+                    // Get word display with syllable highlighting
+                    let wordDisplay;
+                    if (group.syllable_info) {
+                        // Create highlighted word display showing rhyming syllables
+                        wordDisplay = group.words.map(word => {
+                            const wordKey = `${word.line_index}_${word.word_index}`;
+                            const syllableInfo = group.syllable_info[wordKey];
+
+                            if (syllableInfo) {
+                                // Highlight the rhyming syllable within the word
+                                const syllableText = syllableInfo.syllable_text;
+                                const wordText = word.clean;
+
+                                // Find the syllable in the word and highlight it
+                                const syllableLower = syllableText.toLowerCase();
+                                const wordLower = wordText.toLowerCase();
+                                const syllableIndex = wordLower.indexOf(syllableLower);
+
+                                if (syllableIndex >= 0) {
+                                    const before = wordText.substring(0, syllableIndex);
+                                    const highlighted = wordText.substring(syllableIndex, syllableIndex + syllableText.length);
+                                    const after = wordText.substring(syllableIndex + syllableText.length);
+
+                                    return `${before}<span style="background-color: ${group.color}; color: white; padding: 1px 2px; border-radius: 2px; font-weight: bold;">${highlighted}</span>${after}`;
+                                }
+                            }
+
+                            return word.clean;
+                        }).join(', ');
+                    } else if (group.type === 'multisyllabic') {
+                        wordDisplay = group.words.map(w => w.rhyme_part || w.clean).join(', ');
+                    } else {
+                        wordDisplay = group.words.map(w => w.clean).join(', ');
+                    }
+
+                    // Limit word display length for readability
+                    if (wordDisplay.length > 60) {
+                        const words = wordDisplay.split(', ');
+                        if (words.length > 8) {
+                            wordDisplay = words.slice(0, 8).join(', ') + ` ... (+${words.length - 8} more)`;
+                        }
+                    }
+
+                    groupDiv.innerHTML = `
+                        <span class="group-label" style="background-color: ${group.color};">
+                            ${group.letter}
+                        </span>
+                        <span class="group-words">${wordDisplay}</span>
+                        <span class="rhyme-type-badge ${badgeClass}">${rhymeTypeBadge}</span>
+                    `;
+                    summaryDiv.appendChild(groupDiv);
+                });
+
+                results.appendChild(summaryDiv);
+            }
+
+            output.style.display = 'block';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        // Allow Enter+Shift to analyze
+        document.getElementById('textInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.shiftKey) {
+                e.preventDefault();
+                analyzeRhymes();
+            }
+        });
+
+        // Color palettes for light and dark modes
+        const lightModeColors = [
+            '#C0392B', '#138D75', '#1F618D', '#27AE60', '#F39C12', '#8E44AD',
+            '#16A085', '#D68910', '#7D3C98', '#2E86C1', '#E67E22', '#229954',
+            '#CB4335', '#2874A6', '#A569BD', '#148F77'
+        ];
+
+        const darkModeColors = [
+            '#8B2B2B', '#0F6B5C', '#1A4E73', '#1F8A4C', '#C2790F', '#6A3487',
+            '#12806A', '#A86D0D', '#5F2C75', '#256A9A', '#B8591C', '#1C7542',
+            '#9A342A', '#1F5A84', '#824A95', '#0F6B5C'
+        ];
+
+        function getThemeColors() {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            return isDark ? darkModeColors : lightModeColors;
+        }
+
+        function getTextColor() {
+            const isDark = document.body.getAttribute('data-theme') === 'dark';
+            return isDark ? '#E8E8E8' : '#ffffff';
+        }
+
+        // Dark mode toggle
+        function toggleTheme() {
+            const body = document.body;
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+
+            const toggle = document.querySelector('.theme-toggle');
+            toggle.textContent = newTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+
+            // Re-analyze if results are shown to update colors
+            const output = document.getElementById('output');
+            if (output.style.display === 'block') {
+                analyzeRhymes();
+            }
+        }
+
+        // Load saved theme
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+
+            const toggle = document.querySelector('.theme-toggle');
+            toggle.textContent = savedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
+        });
+    </script>
+</body>
+</html>
