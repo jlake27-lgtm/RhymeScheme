@@ -37,25 +37,83 @@ def clean_word(word):
 
     return re.sub(r'[^\w]', '', word.lower())
 
+def phonetic_similarity(phones1, phones2, threshold=0.7):
+    """Calculate phonetic similarity between two phoneme sequences"""
+    if not phones1 or not phones2:
+        return 0.0
+
+    # Get rhyming parts (suffix similarity is most important for rhymes)
+    rhyme1 = pronouncing.rhyming_part(phones1)
+    rhyme2 = pronouncing.rhyming_part(phones2)
+
+    if not rhyme1 or not rhyme2:
+        return 0.0
+
+    # Split into phonemes
+    phonemes1 = rhyme1.split()
+    phonemes2 = rhyme2.split()
+
+    # Calculate similarity score based on matching phonemes
+    if len(phonemes1) == 0 or len(phonemes2) == 0:
+        return 0.0
+
+    # For exact matches
+    if rhyme1 == rhyme2:
+        return 1.0
+
+    # For near-matches, check phoneme overlap
+    common_phonemes = 0
+    max_len = max(len(phonemes1), len(phonemes2))
+    min_len = min(len(phonemes1), len(phonemes2))
+
+    # Check overlap from the end (most important for rhymes)
+    for i in range(min_len):
+        if phonemes1[-(i+1)] == phonemes2[-(i+1)]:
+            common_phonemes += 1
+        else:
+            break
+
+    # Calculate similarity score
+    similarity = common_phonemes / max_len
+
+    # Special cases for known slant rhymes
+    slant_rhyme_patterns = [
+        # -ing variations (pimping/tripping)
+        (['IH1', 'M', 'P', 'IH0', 'NG'], ['IH1', 'P', 'IH0', 'NG']),
+        # -er variations (grinder/miner)
+        (['AY1', 'N', 'D', 'ER0'], ['AY1', 'N', 'ER0']),
+        # -uble variations (subtle/trouble)
+        (['AH1', 'T', 'AH0', 'L'], ['AH1', 'B', 'AH0', 'L'])
+    ]
+
+    for pattern1, pattern2 in slant_rhyme_patterns:
+        if (phonemes1 == pattern1 and phonemes2 == pattern2) or \
+           (phonemes1 == pattern2 and phonemes2 == pattern1):
+            similarity = 0.8  # High similarity for known slant rhymes
+
+    return similarity
+
 def find_all_rhymes(text):
-    """Main rhyme detection function using pronouncing library"""
+    """Enhanced rhyme detection with phonetic similarity"""
     lines = text.split('\n')
     all_words = []
 
-    # Step 1: Extract all words with positions
+    # Step 1: Extract all words with positions and phonetic data
     for line_idx, line in enumerate(lines):
         words = line.split()
         for word_idx, word in enumerate(words):
             clean = clean_word(word)
             if len(clean) >= 2:
+                phones = pronouncing.phones_for_word(clean)
                 all_words.append({
                     'original': word,
                     'clean': clean,
                     'line_index': line_idx,
-                    'word_index': word_idx
+                    'word_index': word_idx,
+                    'phones': phones[0] if phones else None
                 })
 
-    # Step 2: Find rhyme groups using pronouncing library
+    # Step 2: Find rhyme groups using enhanced detection
     rhyme_groups = []
     used_words = set()
     group_counter = 0
@@ -66,25 +124,31 @@ def find_all_rhymes(text):
     ]
 
     for word_obj in all_words:
-        if word_obj['clean'] in used_words:
+        if word_obj['clean'] in used_words or not word_obj['phones']:
             continue
 
-        # Find all words that rhyme with this one
+        # Find exact rhymes first
         rhyming_words = pronouncing.rhymes(word_obj['clean'])
 
         # Find which of our words are in the rhyming list
         group_words = [word_obj]  # Start with current word
+
         for other_word_obj in all_words:
             if (other_word_obj['clean'] != word_obj['clean'] and
                 other_word_obj['clean'] not in used_words and
-                other_word_obj['clean'] in rhyming_words):
-                group_words.append(other_word_obj)
+                other_word_obj['phones']):
+
+                # Check exact rhymes first
+                if other_word_obj['clean'] in rhyming_words:
+                    group_words.append(other_word_obj)
+                # Check phonetic similarity for slant rhymes
+                elif phonetic_similarity(word_obj['phones'], other_word_obj['phones']) >= 0.7:
+                    group_words.append(other_word_obj)
 
         # Only create group if we have at least 2 words
         if len(group_words) >= 2:
             # Get rhyming part for syllable highlighting
-            phones = pronouncing.phones_for_word(word_obj['clean'])
-            rhyme_part = pronouncing.rhyming_part(phones[0]) if phones else None
+            rhyme_part = pronouncing.rhyming_part(word_obj['phones'])
 
             rhyme_groups.append({
                 'letter': chr(ord('A') + group_counter),
@@ -146,75 +210,84 @@ def create_syllable_breakdown(original_word, clean_word, rhyme_part, color):
     syllables = []
     word_lower = clean_word.lower()
 
+    # Simple words that should be highlighted completely
+    simple_words = ['beat', 'meat', 'heat', 'sweet', 'neat', 'script', 'dipped', 'lipped']
+
+    if word_lower in simple_words or len(word_lower) <= 4:
+        # Highlight the whole word for simple/short words
+        syllables.append({
+            'text': original_word,
+            'rhyme_group': rhyme_part,
+            'color': color,
+            'is_rhyming': True
+        })
+        return syllables
+
     # For multisyllabic words, try to identify the rhyming ending
-    if len(word_lower) > 3:
-        # More specific rhyming endings with better boundaries
-        rhyming_patterns = [
-            ('ipping', 'ipping'),  # tripping, dripping, stripping
-            ('iner', 'iner'),      # miner, diner, signer
-            ('igner', 'igner'),    # signer
-            ('ner', 'ner'),        # miner, signer (fallback)
-            ('ing', 'ing'),        # general -ing words
-            ('er', 'er'),          # general -er words
-            ('ent', 'ent'),        # president, evident, etc.
-            ('ant', 'ant'),        # hesitant, etc.
-            ('tion', 'tion'),      # action, etc.
-            ('sion', 'sion'),      # vision, etc.
-            ('ly', 'ly'),          # quickly, etc.
-            ('ty', 'ty'),          # beauty, etc.
-            ('cy', 'cy'),          # policy, etc.
-            ('est', 'est'),        # biggest, etc.
-            ('ness', 'ness'),      # kindness, etc.
-            ('ed', 'ed'),          # played, etc.
-        ]
+    # More specific rhyming endings with better boundaries
+    rhyming_patterns = [
+        ('ipping', 'ipping'),  # tripping, dripping, stripping
+        ('imping', 'imping'),  # pimping
+        ('inder', 'inder'),    # grinder, finder
+        ('iner', 'iner'),      # miner, diner
+        ('igner', 'igner'),    # signer
+        ('inor', 'inor'),      # minor
+        ('uble', 'uble'),      # trouble, double, bubble
+        ('ubtle', 'ubtle'),    # subtle
+        ('ner', 'ner'),        # miner, signer (fallback)
+        ('ing', 'ing'),        # general -ing words
+        ('er', 'er'),          # general -er words
+        ('ent', 'ent'),        # president, evident, etc.
+        ('ant', 'ant'),        # hesitant, etc.
+        ('tion', 'tion'),      # action, etc.
+        ('sion', 'sion'),      # vision, etc.
+        ('ly', 'ly'),          # quickly, etc.
+        ('ty', 'ty'),          # beauty, etc.
+        ('cy', 'cy'),          # policy, etc.
+        ('est', 'est'),        # biggest, etc.
+        ('ness', 'ness'),      # kindness, etc.
+        ('ed', 'ed'),          # played, etc.
+    ]
 
-        rhyming_syllable = None
-        prefix = original_word
+    rhyming_syllable = None
+    prefix = original_word
 
-        # Check for specific patterns first (most specific to least specific)
-        for pattern, ending in rhyming_patterns:
-            if word_lower.endswith(pattern):
-                rhyming_syllable = original_word[-len(ending):]
-                prefix = original_word[:-len(ending)]
-                break
+    # Check for specific patterns first (most specific to least specific)
+    for pattern, ending in rhyming_patterns:
+        if word_lower.endswith(pattern):
+            rhyming_syllable = original_word[-len(ending):]
+            prefix = original_word[:-len(ending)]
+            break
 
-        # If no pattern found, use smart splitting for longer words
-        if not rhyming_syllable and len(word_lower) >= 4:
-            # For words like "grinder", "finder" - take last 2-3 chars as rhyming part
-            if word_lower.endswith('er'):
-                split_point = len(original_word) - 2
-            elif word_lower.endswith('ing'):
-                split_point = len(original_word) - 3
-            else:
-                split_point = max(1, len(original_word) - 3)
-
-            prefix = original_word[:split_point]
-            rhyming_syllable = original_word[split_point:]
-
-        # Create syllable breakdown
-        if prefix and rhyming_syllable and len(prefix) > 0:
-            syllables.append({
-                'text': prefix,
-                'rhyme_group': None,
-                'color': None,
-                'is_rhyming': False
-            })
-            syllables.append({
-                'text': rhyming_syllable,
-                'rhyme_group': rhyme_part,
-                'color': color,
-                'is_rhyming': True
-            })
+    # If no pattern found, use smart splitting for longer words
+    if not rhyming_syllable and len(word_lower) >= 4:
+        # For words like "grinder", "finder" - take last 2-3 chars as rhyming part
+        if word_lower.endswith('er'):
+            split_point = len(original_word) - 2
+        elif word_lower.endswith('ing'):
+            split_point = len(original_word) - 3
         else:
-            # Fallback: highlight whole word
-            syllables.append({
-                'text': original_word,
-                'rhyme_group': rhyme_part,
-                'color': color,
-                'is_rhyming': True
-            })
+            split_point = max(1, len(original_word) - 3)
+
+        prefix = original_word[:split_point]
+        rhyming_syllable = original_word[split_point:]
+
+    # Create syllable breakdown
+    if prefix and rhyming_syllable and len(prefix) > 0:
+        syllables.append({
+            'text': prefix,
+            'rhyme_group': None,
+            'color': None,
+            'is_rhyming': False
+        })
+        syllables.append({
+            'text': rhyming_syllable,
+            'rhyme_group': rhyme_part,
+            'color': color,
+            'is_rhyming': True
+        })
     else:
-        # Short word - highlight the whole thing
+        # Fallback: highlight whole word
         syllables.append({
             'text': original_word,
             'rhyme_group': rhyme_part,
