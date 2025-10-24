@@ -85,8 +85,105 @@
             opacity: 0.8;
         }
 
+        .lyrics-search-section {
+            margin-bottom: 30px;
+            padding: 25px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+        }
+
+        .lyrics-search-section h3 {
+            margin: 0 0 20px 0;
+            color: var(--text-color);
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .search-inputs {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-inputs input {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--container-bg);
+            color: var(--text-color);
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .search-inputs input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .search-inputs input::placeholder {
+            color: var(--accent-color);
+            opacity: 0.6;
+        }
+
+        .search-btn {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+            padding: 12px 20px;
+            border: 1px solid var(--button-bg);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .search-btn:hover {
+            opacity: 0.9;
+        }
+
+        .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .divider {
+            text-align: center;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background-color: var(--border-color);
+        }
+
+        .divider span {
+            background-color: var(--container-bg);
+            color: var(--accent-color);
+            padding: 0 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
         .input-group {
             margin-bottom: 30px;
+        }
+
+        .input-group h3 {
+            margin: 0 0 15px 0;
+            color: var(--text-color);
+            font-size: 1.2rem;
+            font-weight: 600;
         }
 
         textarea {
@@ -344,6 +441,19 @@
             .group-label {
                 margin-right: 0;
             }
+
+            .search-inputs {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-inputs input {
+                min-width: auto;
+            }
+
+            .lyrics-search-section {
+                padding: 20px;
+            }
         }
     </style>
 </head>
@@ -354,8 +464,22 @@
     </div>
 
     <div class="container">
+        <!-- Lyrics Search Section -->
+        <div class="lyrics-search-section">
+            <h3>Search Song Lyrics</h3>
+            <div class="search-inputs">
+                <input type="text" id="artistInput" placeholder="Artist name (e.g., Eminem)" />
+                <input type="text" id="songInput" placeholder="Song title (e.g., Lose Yourself)" />
+                <button class="search-btn" id="searchBtn" onclick="searchLyrics()">Search Lyrics</button>
+            </div>
+        </div>
+
+        <div class="divider">
+            <span>OR</span>
+        </div>
 
         <div class="input-group">
+            <h3>Enter Text Manually</h3>
             <textarea id="textInput" placeholder="Paste your poem, rap lyrics, or any text here...">Tripping off the beat kinda, dripping off the meat grinder
 Heat niner, pimping, stripping, soft sweet minor
 China was a neat signer, trouble with the script
@@ -375,6 +499,59 @@ The magnificent different president, evident hesitant</textarea>
     </div>
 
     <script>
+        async function searchLyrics() {
+            const artist = document.getElementById('artistInput').value.trim();
+            const song = document.getElementById('songInput').value.trim();
+            const btn = document.getElementById('searchBtn');
+            const textInput = document.getElementById('textInput');
+            const errorDiv = document.getElementById('error');
+
+            if (!artist || !song) {
+                showError('Please enter both artist name and song title.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Searching...';
+            errorDiv.style.display = 'none';
+
+            try {
+                const response = await fetch('/search-lyrics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ artist: artist, song: song })
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.lyrics) {
+                    // Populate the text area with the found lyrics
+                    textInput.value = data.lyrics;
+
+                    // Show success message briefly
+                    showError(`✓ Found lyrics for "${data.song}" by ${data.artist}. Click "Analyze Rhyme Scheme" below to analyze!`);
+                    document.getElementById('error').style.backgroundColor = '#22c55e';
+                    document.getElementById('error').style.borderColor = '#22c55e';
+                    document.getElementById('error').style.color = '#ffffff';
+
+                    // Clear inputs
+                    document.getElementById('artistInput').value = '';
+                    document.getElementById('songInput').value = '';
+                } else {
+                    showError(data.error || 'No lyrics found for this song. Please check the artist and song name.');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Failed to search for lyrics. Make sure the server is running.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Search Lyrics';
+            }
+        }
+
         async function analyzeRhymes() {
             const text = document.getElementById('textInput').value.trim();
             const btn = document.getElementById('analyzeBtn');
@@ -699,6 +876,11 @@ The magnificent different president, evident hesitant</textarea>
             const errorDiv = document.getElementById('error');
             errorDiv.textContent = message;
             errorDiv.style.display = 'block';
+
+            // Reset to default error styling
+            errorDiv.style.backgroundColor = '';
+            errorDiv.style.borderColor = '';
+            errorDiv.style.color = '';
         }
 
         // Allow Enter+Shift to analyze
@@ -706,6 +888,31 @@ The magnificent different president, evident hesitant</textarea>
             if (e.key === 'Enter' && e.shiftKey) {
                 e.preventDefault();
                 analyzeRhymes();
+            }
+        });
+
+        // Allow Enter to search lyrics
+        document.getElementById('artistInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const songInput = document.getElementById('songInput');
+                if (songInput.value.trim()) {
+                    searchLyrics();
+                } else {
+                    songInput.focus();
+                }
+            }
+        });
+
+        document.getElementById('songInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const artistInput = document.getElementById('artistInput');
+                if (artistInput.value.trim()) {
+                    searchLyrics();
+                } else {
+                    artistInput.focus();
+                }
             }
         });
 

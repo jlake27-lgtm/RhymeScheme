@@ -2,13 +2,73 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import re
 import pronouncing
+import requests
+from urllib.parse import quote
+import lyricsgenius
+import os
+from pathlib import Path
+from bs4 import BeautifulSoup
 
 app = Flask(__name__)
 CORS(app)
 
+# Initialize Genius API
+def load_genius_token():
+    """Load Genius API token from environment or .env file"""
+    # Try environment variable first
+    token = os.getenv('GENIUS_ACCESS_TOKEN')
+    if token:
+        return token
+
+    # Try to load from .env file
+    env_file = Path('.env')
+    if env_file.exists():
+        with open(env_file, 'r') as f:
+            for line in f:
+                if line.startswith('GENIUS_ACCESS_TOKEN='):
+                    return line.split('=', 1)[1].strip()
+
+    return None
+
+# Initialize Genius client
+genius_token = load_genius_token()
+genius = None
+if genius_token:
+    try:
+        genius = lyricsgenius.Genius(genius_token)
+        genius.verbose = False  # Turn off status messages
+        genius.remove_section_headers = True  # Remove [Verse 1], [Chorus], etc.
+        genius.skip_non_songs = False  # Include all results
+        genius.excluded_terms = []  # Don't exclude any terms
+        print("✓ Genius API initialized successfully")
+        print(f"✓ Token: {genius_token[:10]}...{genius_token[-10:]}")  # Show partial token for debugging
+    except Exception as e:
+        print(f"⚠ Warning: Failed to initialize Genius API: {e}")
+        genius = None
+else:
+    print("⚠ Warning: No Genius API token found. Create a .env file with GENIUS_ACCESS_TOKEN.")
+    genius = None
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
+
+@app.route('/test-genius', methods=['GET'])
+def test_genius():
+    """Test endpoint to verify Genius API connectivity"""
+    if not genius:
+        return jsonify({'status': 'error', 'message': 'Genius API not initialized'})
+
+    try:
+        # Try a simple search that should work
+        results = genius.search("test")
+        return jsonify({
+            'status': 'success',
+            'message': 'Genius API is working',
+            'results_count': len(results['hits']) if results and 'hits' in results else 0
+        })
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'API test failed: {str(e)}'})
 
 @app.route('/analyze', methods=['POST'])
 def analyze_rhyme_scheme():
@@ -22,6 +82,169 @@ def analyze_rhyme_scheme():
         return jsonify(analysis)
     except Exception as e:
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
+
+@app.route('/search-lyrics', methods=['POST'])
+def search_lyrics():
+    try:
+        data = request.get_json()
+        artist = data.get('artist', '').strip()
+        song = data.get('song', '').strip()
+
+        if not artist or not song:
+            return jsonify({'error': 'Artist and song name are required'}), 400
+
+        # Check if Genius API is available
+        if not genius:
+            return jsonify({
+                'success': False,
+                'error': 'Genius API not configured. Please set up GENIUS_ACCESS_TOKEN in .env file.'
+            }), 503
+
+        try:
+            # Search for the song using direct Genius API calls
+            print(f"Searching for: {artist} - {song}")
+
+            # Search for the song
+            search_query = f"{song} {artist}"
+            search_url = f"https://api.genius.com/search?q={quote(search_query)}"
+
+            headers = {
+                'Authorization': f'Bearer {genius_token}',
+                'User-Agent': 'RhymeScheme'
+            }
+
+            # Search for the song
+            search_response = requests.get(search_url, headers=headers, timeout=10)
+            search_response.raise_for_status()
+
+            search_data = search_response.json()
+            hits = search_data.get('response', {}).get('hits', [])
+
+            if not hits:
+                return jsonify({
+                    'success': False,
+                    'error': f'No songs found for "{song}" by {artist}. Try different search terms.'
+                }), 404
+
+            # Find the best match
+            best_match = None
+            for hit in hits:
+                result = hit.get('result', {})
+                song_title = result.get('title', '').lower()
+                artist_name = result.get('primary_artist', {}).get('name', '').lower()
+
+                # Simple matching logic
+                if (song.lower() in song_title or song_title in song.lower()) and \
+                   (artist.lower() in artist_name or artist_name in artist.lower()):
+                    best_match = result
+                    break
+
+            # If no exact match, use the first result
+            if not best_match and hits:
+                best_match = hits[0].get('result', {})
+
+            if best_match:
+                song_id = best_match.get('id')
+                song_title = best_match.get('title')
+                artist_name = best_match.get('primary_artist', {}).get('name')
+                song_url = best_match.get('url')
+
+                # Get lyrics by scraping the song page
+                lyrics = scrape_genius_lyrics(song_url)
+
+                if lyrics:
+                    song_info = {
+                        'success': True,
+                        'lyrics': lyrics,
+                        'artist': artist_name,
+                        'song': song_title,
+                        'url': song_url,
+                        'genius_id': song_id
+                    }
+
+                    print(f"✓ Found lyrics for: {artist_name} - {song_title}")
+                    return jsonify(song_info)
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Found song but could not retrieve lyrics for "{song_title}" by {artist_name}'
+                    }), 404
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'No matching songs found for "{song}" by {artist}'
+                }), 404
+
+        except Exception as e:
+            print(f"Genius API error: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to fetch lyrics: {str(e)}'
+            }), 503
+
+    except Exception as e:
+        print(f"Search error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Search failed: {str(e)}'
+        }), 500
+
+def scrape_genius_lyrics(song_url):
+    """Scrape lyrics from Genius song page"""
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+
+        response = requests.get(song_url, headers=headers, timeout=10)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Find lyrics container (Genius uses different class names that change)
+        lyrics_divs = soup.find_all('div', {'data-lyrics-container': 'true'})
+
+        if not lyrics_divs:
+            # Try alternative selectors
+            lyrics_divs = soup.find_all('div', class_=lambda x: x and 'lyrics' in x.lower())
+
+        if not lyrics_divs:
+            # Try more specific patterns
+            lyrics_divs = soup.find_all('div', class_=lambda x: x and ('Lyrics__Container' in str(x)))
+
+        if lyrics_divs:
+            lyrics_text = ''
+            for div in lyrics_divs:
+                # Remove unwanted elements
+                for unwanted in div.find_all(['script', 'style', 'div'], class_=lambda x: x and 'ad' in str(x).lower()):
+                    unwanted.decompose()
+
+                text = div.get_text(separator='\n', strip=True)
+                lyrics_text += text + '\n'
+
+            # Clean up the lyrics
+            lyrics_text = lyrics_text.strip()
+
+            # Remove common artifacts
+            lines = lyrics_text.split('\n')
+            cleaned_lines = []
+
+            for line in lines:
+                line = line.strip()
+                # Skip empty lines and common artifacts
+                if line and not line.startswith('[') and not line.endswith(']'):
+                    # Remove section headers like [Verse 1], [Chorus], etc.
+                    if not (line.startswith('[') and line.endswith(']')):
+                        cleaned_lines.append(line)
+
+            if cleaned_lines:
+                return '\n'.join(cleaned_lines)
+
+        return None
+
+    except Exception as e:
+        print(f"Error scraping lyrics: {e}")
+        return None
 
 def clean_word(word):
     """Remove punctuation and convert to lowercase"""
