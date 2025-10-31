@@ -75,10 +75,21 @@ def analyze_rhyme_scheme():
     try:
         data = request.get_json()
         text = data.get('text', '')
+        sensitivity = data.get('sensitivity', 70)  # Default to 70%
+
         if not text:
             return jsonify({'error': 'No text provided'}), 400
 
-        analysis = find_all_rhymes(text)
+        # Convert percentage to threshold with better mapping
+        # 0% = 0.95 (near perfect only), 50% = 0.7 (balanced), 100% = 0.4 (loose)
+        if sensitivity <= 50:
+            # 0-50%: 0.95 to 0.7 (strict to balanced)
+            threshold = 0.95 - (sensitivity / 50.0 * 0.25)
+        else:
+            # 50-100%: 0.7 to 0.4 (balanced to loose)
+            threshold = 0.7 - ((sensitivity - 50) / 50.0 * 0.3)
+
+        analysis = find_all_rhymes(text, threshold)
         return jsonify(analysis)
     except Exception as e:
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
@@ -261,7 +272,7 @@ def clean_word(word):
     return re.sub(r'[^\w]', '', word.lower())
 
 def phonetic_similarity(phones1, phones2, threshold=0.7):
-    """Calculate phonetic similarity between two phoneme sequences"""
+    """Enhanced phonetic similarity with better rhyme accuracy"""
     if not phones1 or not phones2:
         return 0.0
 
@@ -272,51 +283,274 @@ def phonetic_similarity(phones1, phones2, threshold=0.7):
     if not rhyme1 or not rhyme2:
         return 0.0
 
-    # Split into phonemes
-    phonemes1 = rhyme1.split()
-    phonemes2 = rhyme2.split()
-
-    # Calculate similarity score based on matching phonemes
-    if len(phonemes1) == 0 or len(phonemes2) == 0:
-        return 0.0
-
     # For exact matches
     if rhyme1 == rhyme2:
         return 1.0
 
-    # For near-matches, check phoneme overlap
-    common_phonemes = 0
-    max_len = max(len(phonemes1), len(phonemes2))
-    min_len = min(len(phonemes1), len(phonemes2))
+    # Split into phonemes
+    phonemes1 = rhyme1.split()
+    phonemes2 = rhyme2.split()
 
-    # Check overlap from the end (most important for rhymes)
+    if len(phonemes1) == 0 or len(phonemes2) == 0:
+        return 0.0
+
+    # Enhanced similarity calculation
+    return calculate_enhanced_phonetic_similarity(phonemes1, phonemes2)
+
+def calculate_enhanced_phonetic_similarity(phonemes1, phonemes2):
+    """More sophisticated phonetic similarity calculation"""
+
+    # Vowel phonemes (including stressed and unstressed variants)
+    vowels = {'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY', 'IH', 'IY', 'OW', 'OY', 'UH', 'UW'}
+
+    # Extract vowel sounds and their positions
+    vowels1 = [(i, p) for i, p in enumerate(phonemes1) if any(p.startswith(v) for v in vowels)]
+    vowels2 = [(i, p) for i, p in enumerate(phonemes2) if any(p.startswith(v) for v in vowels)]
+
+    # If no vowels, can't be a good rhyme
+    if not vowels1 or not vowels2:
+        return 0.0
+
+    # Score components
+    vowel_score = 0.0
+    consonant_score = 0.0
+    ending_score = 0.0
+
+    # 1. Vowel sound similarity (most important for rhymes)
+    last_vowel1 = vowels1[-1][1]  # Last vowel sound
+    last_vowel2 = vowels2[-1][1]
+
+    # Remove stress numbers for comparison
+    clean_vowel1 = ''.join(c for c in last_vowel1 if c.isalpha())
+    clean_vowel2 = ''.join(c for c in last_vowel2 if c.isalpha())
+
+    if clean_vowel1 == clean_vowel2:
+        vowel_score = 1.0
+    elif are_similar_vowels(clean_vowel1, clean_vowel2):
+        vowel_score = 0.7
+    else:
+        # If main vowel sounds don't match, it's not a good rhyme
+        return 0.0
+
+    # 2. Ending consonant similarity
+    min_len = min(len(phonemes1), len(phonemes2))
+    max_len = max(len(phonemes1), len(phonemes2))
+
+    # Check how many phonemes match from the end
+    matching_from_end = 0
     for i in range(min_len):
         if phonemes1[-(i+1)] == phonemes2[-(i+1)]:
-            common_phonemes += 1
+            matching_from_end += 1
         else:
             break
 
-    # Calculate similarity score
-    similarity = common_phonemes / max_len
+    if matching_from_end >= 2:  # At least 2 phonemes match
+        ending_score = matching_from_end / max_len
+    elif matching_from_end == 1 and min_len <= 2:  # Short words with 1 match
+        ending_score = 0.5
 
-    # Special cases for known slant rhymes
-    slant_rhyme_patterns = [
-        # -ing variations (pimping/tripping)
-        (['IH1', 'M', 'P', 'IH0', 'NG'], ['IH1', 'P', 'IH0', 'NG']),
-        # -er variations (grinder/miner)
-        (['AY1', 'N', 'D', 'ER0'], ['AY1', 'N', 'ER0']),
-        # -uble variations (subtle/trouble)
-        (['AH1', 'T', 'AH0', 'L'], ['AH1', 'B', 'AH0', 'L'])
+    # 3. Consonant cluster similarity (for words ending in similar sounds)
+    consonant_score = calculate_consonant_similarity(phonemes1, phonemes2)
+
+    # 4. Apply penalties for length mismatches
+    length_penalty = 1.0
+    if max_len > min_len * 2:  # Very different lengths
+        length_penalty = 0.5
+
+    # Final weighted score
+    final_score = (vowel_score * 0.5 + ending_score * 0.3 + consonant_score * 0.2) * length_penalty
+
+    return min(final_score, 1.0)
+
+def are_similar_vowels(vowel1, vowel2):
+    """Check if two vowel sounds are similar enough for slant rhymes"""
+    similar_groups = [
+        {'IH', 'IY'},  # bit/beat
+        {'EH', 'AE'},  # bet/bat
+        {'AH', 'UH'},  # but/put
+        {'OW', 'AO'},  # boat/bought
+        {'AY', 'EY'},  # bite/bait
+        {'AW', 'OW'},  # bout/boat
     ]
 
-    for pattern1, pattern2 in slant_rhyme_patterns:
-        if (phonemes1 == pattern1 and phonemes2 == pattern2) or \
-           (phonemes1 == pattern2 and phonemes2 == pattern1):
-            similarity = 0.8  # High similarity for known slant rhymes
+    for group in similar_groups:
+        if vowel1 in group and vowel2 in group:
+            return True
+    return False
 
-    return similarity
+def calculate_consonant_similarity(phonemes1, phonemes2):
+    """Calculate similarity of consonant patterns"""
+    # Focus on ending consonants after the main vowel
+    vowels = {'AE', 'AH', 'AO', 'AW', 'AY', 'EH', 'ER', 'EY', 'IH', 'IY', 'OW', 'OY', 'UH', 'UW'}
 
-def find_all_rhymes(text):
+    # Find last vowel position in each word
+    last_vowel_pos1 = -1
+    last_vowel_pos2 = -1
+
+    for i, p in enumerate(phonemes1):
+        if any(p.startswith(v) for v in vowels):
+            last_vowel_pos1 = i
+
+    for i, p in enumerate(phonemes2):
+        if any(p.startswith(v) for v in vowels):
+            last_vowel_pos2 = i
+
+    if last_vowel_pos1 == -1 or last_vowel_pos2 == -1:
+        return 0.0
+
+    # Get consonants after last vowel
+    consonants1 = phonemes1[last_vowel_pos1 + 1:]
+    consonants2 = phonemes2[last_vowel_pos2 + 1:]
+
+    if not consonants1 and not consonants2:
+        return 1.0  # Both end in vowels
+
+    if len(consonants1) == 0 or len(consonants2) == 0:
+        return 0.3  # One ends in vowel, one in consonant
+
+    # Count matching consonants
+    matches = sum(1 for c1, c2 in zip(consonants1, consonants2) if c1 == c2)
+    max_consonants = max(len(consonants1), len(consonants2))
+
+    return matches / max_consonants if max_consonants > 0 else 0.0
+
+def calculate_rhyme_score(text, rhyme_groups, threshold):
+    """Calculate comprehensive rhyme quality score"""
+    lines = text.split('\n')
+    total_lines = len([line for line in lines if line.strip()])
+    all_words = text.split()
+    total_words = len(all_words)
+
+    if total_words == 0:
+        return {
+            'overall_score': 0,
+            'base_density': 0,
+            'syllable_complexity': 0,
+            'rhyme_quality': 0,
+            'vocabulary_diversity': 0,
+            'pattern_sophistication': 0,
+            'statistics': {}
+        }
+
+    # Count rhyming words and analyze quality
+    total_rhyming_words = 0
+    perfect_rhymes = 0
+    slant_rhymes = 0
+    syllable_points = 0
+
+    for group in rhyme_groups:
+        group_size = len(group['words'])
+        total_rhyming_words += group_size
+
+        # Analyze syllable complexity
+        for word_obj in group['words']:
+            word = word_obj['clean']
+            syllable_count = estimate_syllables(word)
+            syllable_points += max(1, syllable_count)
+
+            # Determine if perfect or slant rhyme
+            if group_size > 1:
+                # Check against first word in group for quality assessment
+                first_word = group['words'][0]
+                if word != first_word['clean']:
+                    exact_rhymes = pronouncing.rhymes(first_word['clean'])
+                    if word in exact_rhymes:
+                        perfect_rhymes += 1
+                    else:
+                        slant_rhymes += 1
+
+    # Calculate unique words
+    unique_words = len(set(word.lower() for word in all_words))
+
+    # 1. Base Rhyme Density
+    base_density = (total_rhyming_words / total_words) * 100 if total_words > 0 else 0
+
+    # 2. Syllable Complexity Multiplier
+    avg_syllable_bonus = (syllable_points - total_rhyming_words) * 0.2 / max(total_rhyming_words, 1)
+    syllable_multiplier = 1 + avg_syllable_bonus
+
+    # 3. Rhyme Quality Factor
+    total_rhyme_pairs = perfect_rhymes + slant_rhymes
+    if total_rhyme_pairs > 0:
+        quality_factor = (perfect_rhymes * 1.0 + slant_rhymes * 0.7) / total_rhyme_pairs
+    else:
+        quality_factor = 1.0
+
+    # 4. Vocabulary Diversity Bonus
+    diversity_bonus = 1 + (unique_words / total_words * 0.3)
+
+    # 5. Pattern Sophistication
+    num_groups = len(rhyme_groups)
+    avg_group_size = total_rhyming_words / max(num_groups, 1)
+    pattern_score = (num_groups * avg_group_size) / max(total_lines, 1) * 10
+
+    # Final calculation
+    core_score = base_density * syllable_multiplier * quality_factor * diversity_bonus
+    final_score = min(100, core_score + pattern_score)
+
+    # Detailed statistics
+    statistics = {
+        'total_words': total_words,
+        'total_lines': total_lines,
+        'rhyming_words': total_rhyming_words,
+        'unique_words': unique_words,
+        'rhyme_groups': num_groups,
+        'perfect_rhymes': perfect_rhymes,
+        'slant_rhymes': slant_rhymes,
+        'avg_syllables': syllable_points / max(total_rhyming_words, 1),
+        'rhyme_density_percent': round(base_density, 1),
+        'vocabulary_diversity_percent': round((unique_words / total_words) * 100, 1)
+    }
+
+    return {
+        'overall_score': round(final_score, 1),
+        'base_density': round(base_density, 1),
+        'syllable_complexity': round(syllable_multiplier, 2),
+        'rhyme_quality': round(quality_factor, 2),
+        'vocabulary_diversity': round(diversity_bonus, 2),
+        'pattern_sophistication': round(pattern_score, 1),
+        'statistics': statistics
+    }
+
+def estimate_syllables(word):
+    """Estimate syllable count for a word"""
+    word = word.lower()
+    if not word:
+        return 0
+
+    # Simple syllable estimation
+    vowels = "aeiouy"
+    syllable_count = 0
+    prev_was_vowel = False
+
+    for char in word:
+        is_vowel = char in vowels
+        if is_vowel and not prev_was_vowel:
+            syllable_count += 1
+        prev_was_vowel = is_vowel
+
+    # Handle silent e
+    if word.endswith('e') and syllable_count > 1:
+        syllable_count -= 1
+
+    return max(1, syllable_count)
+
+def get_optimal_color(used_colors, available_colors):
+    """Select color with maximum contrast from recently used colors"""
+    if not used_colors:
+        return available_colors[0]
+
+    if len(used_colors) < len(available_colors):
+        # For first few colors, use predefined high-contrast sequence
+        contrast_sequence = [0, 9, 4, 13, 2, 11, 6, 15, 1, 10, 3, 12, 5, 14, 7, 16, 8, 17]
+        for idx in contrast_sequence:
+            if idx < len(available_colors) and available_colors[idx] not in used_colors:
+                return available_colors[idx]
+
+    # Fallback to cycling if we've used all unique colors
+    return available_colors[len(used_colors) % len(available_colors)]
+
+def find_all_rhymes(text, threshold=0.7):
     """Enhanced rhyme detection with phonetic similarity"""
     lines = text.split('\n')
     all_words = []
@@ -340,11 +574,30 @@ def find_all_rhymes(text):
     rhyme_groups = []
     used_words = set()
     group_counter = 0
-    colors = [
-        '#C0392B', '#138D75', '#1F618D', '#27AE60', '#F39C12', '#8E44AD',
-        '#E74C3C', '#16A085', '#2980B9', '#229954', '#E67E22', '#9B59B6',
-        '#CB4335', '#17A2B8', '#28A745', '#FFC107', '#6F42C1', '#DC3545'
+
+    # High-contrast color palette with maximum visual separation
+    base_colors = [
+        '#C0392B',  # Deep Red
+        '#138D75',  # Teal
+        '#F39C12',  # Orange
+        '#8E44AD',  # Purple
+        '#27AE60',  # Green
+        '#1F618D',  # Blue
+        '#E67E22',  # Dark Orange
+        '#9B59B6',  # Light Purple
+        '#229954',  # Dark Green
+        '#2980B9',  # Light Blue
+        '#DC3545',  # Bright Red
+        '#17A2B8',  # Cyan
+        '#28A745',  # Bright Green
+        '#FFC107',  # Yellow
+        '#6F42C1',  # Indigo
+        '#CB4335',  # Burgundy
+        '#16A085',  # Dark Teal
+        '#E74C3C'   # Crimson
     ]
+
+    used_colors = []
 
     for word_obj in all_words:
         if word_obj['clean'] in used_words or not word_obj['phones']:
@@ -365,7 +618,7 @@ def find_all_rhymes(text):
                 if other_word_obj['clean'] in rhyming_words:
                     group_words.append(other_word_obj)
                 # Check phonetic similarity for slant rhymes
-                elif phonetic_similarity(word_obj['phones'], other_word_obj['phones']) >= 0.7:
+                elif phonetic_similarity(word_obj['phones'], other_word_obj['phones']) >= threshold:
                     group_words.append(other_word_obj)
 
         # Only create group if we have at least 2 words
@@ -373,9 +626,13 @@ def find_all_rhymes(text):
             # Get rhyming part for syllable highlighting
             rhyme_part = pronouncing.rhyming_part(word_obj['phones'])
 
+            # Select optimal color with maximum contrast
+            optimal_color = get_optimal_color(used_colors, base_colors)
+            used_colors.append(optimal_color)
+
             rhyme_groups.append({
                 'letter': chr(ord('A') + group_counter),
-                'color': colors[group_counter % len(colors)],
+                'color': optimal_color,
                 'words': group_words,
                 'syllable_info': {
                     'rhyme_sound': rhyme_part,
@@ -392,7 +649,10 @@ def find_all_rhymes(text):
     # Step 3: Create syllable highlights for multisyllabic words
     syllable_highlights = create_syllable_highlights(rhyme_groups)
 
-    # Step 4: Format response for frontend
+    # Step 4: Calculate comprehensive scoring
+    score_data = calculate_rhyme_score(text, rhyme_groups, threshold)
+
+    # Step 5: Format response for frontend
     rhyme_groups_dict = {}
     for group in rhyme_groups:
         rhyme_groups_dict[group['letter']] = group
@@ -401,7 +661,8 @@ def find_all_rhymes(text):
         'lines': lines,
         'groups': rhyme_groups,
         'rhyme_groups': rhyme_groups_dict,
-        'syllable_highlights': syllable_highlights
+        'syllable_highlights': syllable_highlights,
+        'score': score_data
     }
 
 def create_syllable_highlights(rhyme_groups):

@@ -212,8 +212,68 @@
         }
 
         .button-group {
-            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
             margin: 30px 0;
+            flex-wrap: wrap;
+        }
+
+        .sensitivity-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background-color: var(--input-bg);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .sensitivity-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-color);
+            min-width: 80px;
+        }
+
+        .sensitivity-slider {
+            -webkit-appearance: none;
+            width: 120px;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border-color);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .sensitivity-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--button-bg);
+            cursor: pointer;
+            border: 2px solid var(--container-bg);
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .sensitivity-slider::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--button-bg);
+            cursor: pointer;
+            border: 2px solid var(--container-bg);
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+
+        .sensitivity-value {
+            font-size: 13px;
+            color: var(--accent-color);
+            font-weight: 600;
+            min-width: 40px;
         }
 
         .analyze-btn {
@@ -246,6 +306,135 @@
             border-radius: 16px;
             display: none;
             transition: all 0.3s ease;
+        }
+
+        /* Collapsible Section Styles */
+        .collapsible-section {
+            margin: 20px 0;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            overflow: hidden;
+            background-color: var(--container-bg);
+        }
+
+        .collapsible-header {
+            padding: 15px 20px;
+            background-color: var(--input-bg);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s ease;
+            user-select: none;
+        }
+
+        .collapsible-header:hover {
+            background-color: var(--border-color);
+        }
+
+        .collapsible-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        .collapsible-icon {
+            font-size: 1.2rem;
+            color: var(--accent-color);
+            transition: transform 0.3s ease;
+        }
+
+        .collapsible-content {
+            padding: 0 20px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .collapsible-section.open .collapsible-content {
+            padding: 20px;
+            max-height: 1000px;
+        }
+
+        .collapsible-section.open .collapsible-icon {
+            transform: rotate(180deg);
+        }
+
+        /* Score Display Styles */
+        .score-display {
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--accent-color), var(--button-bg));
+            border-radius: 12px;
+            color: white;
+        }
+
+        .overall-score {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 0;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .score-label {
+            font-size: 1.1rem;
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+        }
+
+        .score-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .score-metric {
+            background-color: var(--input-bg);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .score-metric .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--text-color);
+            margin-bottom: 5px;
+        }
+
+        .score-metric .label {
+            font-size: 0.9rem;
+            color: var(--accent-color);
+        }
+
+        /* Statistics Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            background-color: var(--input-bg);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: var(--text-color);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            margin-top: 4px;
         }
 
         .output h3 {
@@ -454,6 +643,19 @@
             .lyrics-search-section {
                 padding: 20px;
             }
+
+            .button-group {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .sensitivity-control {
+                justify-content: center;
+            }
+
+            .sensitivity-slider {
+                width: 100px;
+            }
         }
     </style>
 </head>
@@ -487,12 +689,58 @@ The magnificent different president, evident hesitant</textarea>
         </div>
 
         <div class="button-group">
+            <div class="sensitivity-control">
+                <label class="sensitivity-label" for="sensitivitySlider">Sensitivity:</label>
+                <input type="range"
+                       id="sensitivitySlider"
+                       class="sensitivity-slider"
+                       min="0"
+                       max="100"
+                       value="70"
+                       oninput="updateSensitivity(this.value)"
+                       onchange="reanalyzeWithSensitivity()">
+                <span class="sensitivity-value" id="sensitivityValue">70%</span>
+            </div>
             <button class="analyze-btn" id="analyzeBtn" onclick="analyzeRhymes()">Analyze Rhyme Scheme</button>
         </div>
 
         <div id="output" class="output">
             <h3>Rhyme Analysis Results</h3>
-            <div id="results"></div>
+
+            <!-- Score Display Section -->
+            <div class="score-display" id="scoreDisplay">
+                <div class="overall-score" id="overallScore">--</div>
+                <div class="score-label">Overall Rhyme Score</div>
+                <div class="score-breakdown" id="scoreBreakdown"></div>
+            </div>
+
+            <!-- Statistics Collapsible Section -->
+            <div class="collapsible-section" id="statsSection">
+                <div class="collapsible-header" onclick="toggleSection('statsSection')">
+                    <h3>Statistics & Metrics</h3>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <div class="stats-grid" id="statsGrid"></div>
+                </div>
+            </div>
+
+            <!-- Rhyme Groups Collapsible Section -->
+            <div class="collapsible-section" id="rhymeGroupsSection">
+                <div class="collapsible-header" onclick="toggleSection('rhymeGroupsSection')">
+                    <h3>Rhyme Groups</h3>
+                    <span class="collapsible-icon">▼</span>
+                </div>
+                <div class="collapsible-content">
+                    <div id="rhymeGroups"></div>
+                </div>
+            </div>
+
+            <!-- Analysis Results (Always Open) -->
+            <div style="margin: 20px 0;">
+                <h3 style="margin-bottom: 20px; color: var(--text-color);">Highlighted Lyrics</h3>
+                <div id="results"></div>
+            </div>
         </div>
 
         <div id="error" class="error" style="display: none;"></div>
@@ -552,8 +800,21 @@ The magnificent different president, evident hesitant</textarea>
             }
         }
 
+        function updateSensitivity(value) {
+            document.getElementById('sensitivityValue').textContent = value + '%';
+        }
+
+        async function reanalyzeWithSensitivity() {
+            const text = document.getElementById('textInput').value.trim();
+            if (text && document.getElementById('results').innerHTML) {
+                // Only re-analyze if we have text and previous results
+                await analyzeRhymes();
+            }
+        }
+
         async function analyzeRhymes() {
             const text = document.getElementById('textInput').value.trim();
+            const sensitivity = document.getElementById('sensitivitySlider').value;
             const btn = document.getElementById('analyzeBtn');
             const output = document.getElementById('output');
             const results = document.getElementById('results');
@@ -575,7 +836,10 @@ The magnificent different president, evident hesitant</textarea>
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ text: text })
+                    body: JSON.stringify({
+                        text: text,
+                        sensitivity: parseInt(sensitivity)
+                    })
                 });
 
                 if (!response.ok) {
@@ -732,11 +996,124 @@ The magnificent different president, evident hesitant</textarea>
             return [...syllables, ...endingSyllables];
         }
 
+        function toggleSection(sectionId) {
+            const section = document.getElementById(sectionId);
+            section.classList.toggle('open');
+        }
+
+        function displayScore(scoreData) {
+            const overallScore = document.getElementById('overallScore');
+            const scoreBreakdown = document.getElementById('scoreBreakdown');
+
+            overallScore.textContent = scoreData.overall_score;
+
+            scoreBreakdown.innerHTML = `
+                <div class="score-metric">
+                    <div class="value">${scoreData.base_density}%</div>
+                    <div class="label">Rhyme Density</div>
+                </div>
+                <div class="score-metric">
+                    <div class="value">${scoreData.syllable_complexity}x</div>
+                    <div class="label">Syllable Complexity</div>
+                </div>
+                <div class="score-metric">
+                    <div class="value">${scoreData.rhyme_quality}</div>
+                    <div class="label">Rhyme Quality</div>
+                </div>
+                <div class="score-metric">
+                    <div class="value">${scoreData.vocabulary_diversity}x</div>
+                    <div class="label">Vocabulary Diversity</div>
+                </div>
+                <div class="score-metric">
+                    <div class="value">${scoreData.pattern_sophistication}</div>
+                    <div class="label">Pattern Sophistication</div>
+                </div>
+            `;
+        }
+
+        function displayStatistics(stats) {
+            const statsGrid = document.getElementById('statsGrid');
+
+            statsGrid.innerHTML = `
+                <div class="stat-item">
+                    <div class="stat-value">${stats.total_words}</div>
+                    <div class="stat-label">Total Words</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.total_lines}</div>
+                    <div class="stat-label">Total Lines</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.rhyming_words}</div>
+                    <div class="stat-label">Rhyming Words</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.unique_words}</div>
+                    <div class="stat-label">Unique Words</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.rhyme_groups}</div>
+                    <div class="stat-label">Rhyme Groups</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.perfect_rhymes}</div>
+                    <div class="stat-label">Perfect Rhymes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.slant_rhymes}</div>
+                    <div class="stat-label">Slant Rhymes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.avg_syllables.toFixed(1)}</div>
+                    <div class="stat-label">Avg. Syllables</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.rhyme_density_percent}%</div>
+                    <div class="stat-label">Rhyme Coverage</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.vocabulary_diversity_percent}%</div>
+                    <div class="stat-label">Vocab Diversity</div>
+                </div>
+            `;
+        }
+
+        function displayRhymeGroups(groups) {
+            const rhymeGroups = document.getElementById('rhymeGroups');
+
+            if (groups && groups.length > 0) {
+                let groupsHtml = '';
+                groups.forEach(group => {
+                    const words = group.words.map(w => w.original).join(', ');
+                    groupsHtml += `
+                        <div class="rhyme-group" style="margin-bottom: 15px;">
+                            <div class="group-label" style="color: ${group.color}; font-weight: bold; margin-bottom: 5px;">
+                                Group ${group.letter}:
+                            </div>
+                            <div style="color: var(--text-color); padding-left: 20px;">
+                                ${words}
+                            </div>
+                        </div>
+                    `;
+                });
+                rhymeGroups.innerHTML = groupsHtml;
+            } else {
+                rhymeGroups.innerHTML = '<p style="color: var(--accent-color); text-align: center;">No rhyme groups found.</p>';
+            }
+        }
+
         function displayResults(data) {
             const results = document.getElementById('results');
             const output = document.getElementById('output');
 
             results.innerHTML = '';
+
+            // Display score if available
+            if (data.score) {
+                displayScore(data.score);
+                displayStatistics(data.score.statistics);
+                displayRhymeGroups(data.groups);
+            }
 
             // Update colors based on current theme
             const themeColors = getThemeColors();
@@ -918,15 +1295,15 @@ The magnificent different president, evident hesitant</textarea>
 
         // Color palettes for light and dark modes
         const lightModeColors = [
-            '#C0392B', '#138D75', '#1F618D', '#27AE60', '#F39C12', '#8E44AD',
-            '#16A085', '#D68910', '#7D3C98', '#2E86C1', '#E67E22', '#229954',
-            '#CB4335', '#2874A6', '#A569BD', '#148F77'
+            '#C0392B', '#138D75', '#F39C12', '#8E44AD', '#27AE60', '#1F618D',
+            '#E67E22', '#9B59B6', '#229954', '#2980B9', '#DC3545', '#17A2B8',
+            '#28A745', '#FFC107', '#6F42C1', '#CB4335', '#16A085', '#E74C3C'
         ];
 
         const darkModeColors = [
-            '#8B2B2B', '#0F6B5C', '#1A4E73', '#1F8A4C', '#C2790F', '#6A3487',
-            '#12806A', '#A86D0D', '#5F2C75', '#256A9A', '#B8591C', '#1C7542',
-            '#9A342A', '#1F5A84', '#824A95', '#0F6B5C'
+            '#E74C3C', '#1ABC9C', '#F1C40F', '#A569BD', '#58D68D', '#5DADE2',
+            '#F5B041', '#BB8FCE', '#52C41A', '#74B9FF', '#FF6B6B', '#55EFC4',
+            '#6C5CE7', '#FDCB6E', '#A29BFE', '#FD79A8', '#00CEC9', '#FF7675'
         ];
 
         function getThemeColors() {
