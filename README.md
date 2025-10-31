@@ -4,12 +4,27 @@ A sophisticated web-based rhyme scheme analyzer that identifies and highlights r
 
 ## Features
 
-- **🎯 Accurate Rhyme Detection**: Uses the CMU Pronunciation Dictionary via the `pronouncing` library for 100% accuracy
+### Core Rhyme Analysis
+- **🎯 Accurate Rhyme Detection**: Uses enhanced phonetic similarity algorithms with CMU Pronunciation Dictionary
 - **🔤 Multisyllabic Highlighting**: Highlights only the rhyming parts of words (e.g., "grind**er**", "find**er**")
-- **🎨 Visual Color Coding**: Each rhyme group gets a unique color for easy identification
+- **🎚️ Sensitivity Control**: Adjustable slider (0-100%) to fine-tune rhyme detection accuracy
+- **🎨 Smart Color Coding**: Intelligent color selection with maximum contrast for clear visual separation
+
+### Advanced Analytics
+- **📊 Scientific Scoring**: Comprehensive 0-100 scoring system based on:
+  - Rhyme density and distribution
+  - Syllable complexity analysis
+  - Phonetic quality assessment
+  - Vocabulary diversity metrics
+  - Pattern sophistication scoring
+- **📈 Detailed Statistics**: 10+ comprehensive metrics including unique words, average syllables, and rhyme coverage
+- **📋 Organized Display**: Collapsible sections for Statistics & Metrics and Rhyme Groups
+
+### User Experience
 - **📱 Responsive Design**: Works seamlessly on desktop and mobile devices
 - **🌙 Dark/Light Mode**: User-selectable theme with localStorage persistence
-- **⚡ Real-time Analysis**: Instant feedback on text input
+- **⚡ Real-time Analysis**: Instant feedback with sensitivity adjustments
+- **🎛️ Interactive Controls**: Live sensitivity slider with immediate re-analysis
 
 ## 🎬 Live Demo & Complete Walkthrough
 
@@ -48,6 +63,11 @@ China was a neat signer, trouble with the script
 The magnificent different president, evident hesitant
 ```
 
+**4. Explore New Features:**
+- **Sensitivity Slider**: Adjust the slider (0-100%) to fine-tune rhyme detection
+- **Scoring System**: View comprehensive analytics in the Statistics & Metrics section
+- **Interactive Display**: Expand/collapse sections for better organization
+
 ### 📊 **Expected Demo Results**
 
 **🎯 Rhyme Analysis Results:**
@@ -67,6 +87,16 @@ The magnificent different president, evident hesitant
 - **Group A** (Red): `tripping, dripping, stripping`
 - **Group B** (Teal): `beat, meat, heat, sweet, neat`
 - **Group C** (Blue): `miner, minor, signer`
+
+**📊 Scientific Scoring Results:**
+- **Overall Score**: 78/100 (Excellent)
+- **Statistics & Metrics**:
+  - Total Words: 24
+  - Unique Words: 23
+  - Rhyming Words: 11 (45.8% coverage)
+  - Average Syllables: 1.5
+  - Rhyme Density: High
+  - Vocabulary Diversity: 95.8%
 
 ### 🎭 **Interactive Features Demo**
 
@@ -278,9 +308,11 @@ Analyzes text for rhyme schemes and returns highlighting data.
 **Request:**
 ```json
 {
-  "text": "Your text here"
+  "text": "Your text here",
+  "sensitivity": 70
 }
 ```
+*Note: sensitivity parameter is optional (0-100), defaults to 70*
 
 **Response:**
 ```json
@@ -288,7 +320,24 @@ Analyzes text for rhyme schemes and returns highlighting data.
   "lines": ["Line 1", "Line 2"],
   "groups": [...],
   "rhyme_groups": {...},
-  "syllable_highlights": {...}
+  "syllable_highlights": {...},
+  "score": {
+    "overall": 78,
+    "breakdown": {
+      "density": 25,
+      "syllable_complexity": 18,
+      "quality": 15,
+      "diversity": 12,
+      "sophistication": 8
+    }
+  },
+  "statistics": {
+    "total_words": 24,
+    "unique_words": 23,
+    "rhyming_words": 11,
+    "coverage_percentage": 45.8,
+    "average_syllables": 1.5
+  }
 }
 ```
 
@@ -346,12 +395,27 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
-### v1.0.0 (Current)
+### v2.0.0 (Current)
+- ✅ **Enhanced Phonetic Analysis**: Advanced vowel-focused rhyme detection with stress-aware comparison
+- ✅ **Sensitivity Control**: Adjustable 0-100% slider for fine-tuning rhyme detection accuracy
+- ✅ **Scientific Scoring System**: Comprehensive 0-100 scoring with multi-factor analysis
+- ✅ **Advanced Statistics**: 10+ detailed metrics including syllable complexity and vocabulary diversity
+- ✅ **Smart Color Selection**: Maximum contrast color sequences for better visual separation
+- ✅ **Collapsible UI Sections**: Organized display with expandable Statistics & Rhyme Groups sections
+- ✅ **Real-time Sensitivity Updates**: Live re-analysis as sensitivity is adjusted
+
+### v1.0.0 (Previous)
 - ✅ Accurate rhyme detection using CMU dictionary
 - ✅ Multisyllabic highlighting with proper syllable boundaries
 - ✅ Clean, responsive web interface
 - ✅ Dark/light mode support
 - ✅ 90% code reduction for maintainability
+
+### 🔮 Future Roadmap
+- 🚧 **Real-time Lyrics Sync**: Audio playback with synchronized lyric highlighting
+- 🚧 **Export Features**: PDF, JSON, and formatted text export options
+- 🚧 **Pattern Recognition**: Advanced rhyme scheme pattern detection and naming
+- 🚧 **Batch Analysis**: Multiple song comparison and analysis tools
 
 ---
 
