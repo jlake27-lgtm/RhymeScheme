@@ -26,6 +26,53 @@ A sophisticated web-based rhyme scheme analyzer that identifies and highlights r
 - **⚡ Real-time Analysis**: Instant feedback with sensitivity adjustments
 - **🎛️ Interactive Controls**: Live sensitivity slider with immediate re-analysis
 
+## 🎯 Current Development Status
+
+### 🎬 **Real-Time Lyric Sync (Active Development)**
+
+**Current Goal**: Implement synchronized lyric highlighting with audio playback for karaoke-style presentation.
+
+**Latest Features (v2.1.0 - In Progress)**:
+- ✅ **LRC Integration**: Automatic millisecond-precise timing data from karaoke databases
+- ✅ **YouTube Audio Player**: Hidden iframe player for seamless audio playback
+- ✅ **Fullscreen Sync Mode**: Immersive presentation with real-time highlighting
+- ✅ **YouTube Data API v3**: Dynamic video search replacing hardcoded database
+- ⚠️ **Current Problem**: Limited song availability in fallback database when API quota exceeded
+
+### 🔧 **API Configuration Setup**
+
+**Required API Keys**:
+1. **YouTube Data API v3** (New - for unlimited song search)
+   - Get key: https://console.developers.google.com/
+   - Enable YouTube Data API v3 in your project
+   - Add to `.env`: `YOUTUBE_API_KEY=your_api_key_here`
+
+2. **Genius API** (Existing - for lyrics fetching)
+   - Get token: https://genius.com/api-clients
+   - Add to `.env`: `GENIUS_ACCESS_TOKEN=your_token_here`
+
+**Without API Setup**: App falls back to ~25 hardcoded popular songs
+
+### 🎯 **Known Issues & Solutions**
+
+**Problem 1**: Song search always played same default song
+- **Status**: ✅ Fixed - Removed hardcoded Eminem fallback
+- **Solution**: Proper song matching with null returns for no matches
+
+**Problem 2**: YouTube API quota limits (100 free searches/day)
+- **Status**: ✅ Solved - Intelligent fallback system
+- **Solution**: Graceful degradation to expanded hardcoded database
+
+**Problem 3**: Limited song availability without API configuration
+- **Current**: ~25 popular songs in fallback database
+- **Solution**: Users can configure YouTube API for unlimited search
+
+### 📋 **Next Development Goals**
+- Export functionality (PDF, JSON, formatted text)
+- Audio sync precision improvements (currently 50ms polling)
+- Pattern recognition for complex rhyme schemes
+- Multi-song batch analysis capabilities
+
 ## 🎬 Live Demo & Complete Walkthrough
 
 ### 🚀 **Quick Start Demo**
@@ -269,12 +316,22 @@ console.log(results); // Copy for external use
    pip install -r requirements.txt
    ```
 
-4. **Run the application:**
+4. **Configure API Keys (Optional but Recommended):**
+   ```bash
+   # Copy environment template
+   cp .env.example .env
+
+   # Edit .env file and add your API keys:
+   # GENIUS_ACCESS_TOKEN=your_genius_token_here
+   # YOUTUBE_API_KEY=your_youtube_api_key_here
+   ```
+
+5. **Run the application:**
    ```bash
    python app.py
    ```
 
-5. **Open in browser:**
+6. **Open in browser:**
    Navigate to `http://localhost:8080`
 
 ## Usage
@@ -395,7 +452,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
-### v2.0.0 (Current)
+### v2.1.0 (Current - In Progress)
+- ✅ **Real-Time Lyric Sync**: Audio playback with synchronized highlighting using karaoke-style timing
+- ✅ **YouTube Data API v3 Integration**: Dynamic video search with intelligent fallback system
+- ✅ **LRC Timing Integration**: Automatic millisecond-precise timing data from karaoke databases
+- ✅ **Fullscreen Sync Mode**: Immersive presentation with real-time rhyme highlighting
+- ✅ **Enhanced Audio Search**: Intelligent matching with graceful degradation to hardcoded database
+- 🚧 **Performance Optimization**: Improving sync precision and responsiveness
+
+### v2.0.0 (Released)
 - ✅ **Enhanced Phonetic Analysis**: Advanced vowel-focused rhyme detection with stress-aware comparison
 - ✅ **Sensitivity Control**: Adjustable 0-100% slider for fine-tuning rhyme detection accuracy
 - ✅ **Scientific Scoring System**: Comprehensive 0-100 scoring with multi-factor analysis
@@ -404,7 +469,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - ✅ **Collapsible UI Sections**: Organized display with expandable Statistics & Rhyme Groups sections
 - ✅ **Real-time Sensitivity Updates**: Live re-analysis as sensitivity is adjusted
 
-### v1.0.0 (Previous)
+### v1.0.0 (Initial Release)
 - ✅ Accurate rhyme detection using CMU dictionary
 - ✅ Multisyllabic highlighting with proper syllable boundaries
 - ✅ Clean, responsive web interface
@@ -412,10 +477,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - ✅ 90% code reduction for maintainability
 
 ### 🔮 Future Roadmap
-- 🚧 **Real-time Lyrics Sync**: Audio playback with synchronized lyric highlighting
 - 🚧 **Export Features**: PDF, JSON, and formatted text export options
 - 🚧 **Pattern Recognition**: Advanced rhyme scheme pattern detection and naming
 - 🚧 **Batch Analysis**: Multiple song comparison and analysis tools
+- 🚧 **Audio Sync Precision**: Sub-50ms timing accuracy improvements
+- 🚧 **Custom Song Upload**: Support for user-provided audio files and timing data
 
 ---
 

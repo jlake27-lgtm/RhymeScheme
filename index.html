@@ -6,58 +6,90 @@
     <title>Rhyme Scheme Analyzer</title>
     <style>
         :root {
-            --bg-color: #ffffff;
-            --text-color: #000000;
-            --container-bg: #ffffff;
-            --border-color: #e1e5e9;
-            --input-bg: #f8f9fa;
-            --button-bg: #000000;
-            --button-text: #ffffff;
-            --accent-color: #333333;
-            --shadow: rgba(0, 0, 0, 0.1);
-        }
-
-        [data-theme="dark"] {
+            /* Clean Black & White Design System */
             --bg-color: #000000;
             --text-color: #ffffff;
             --container-bg: #111111;
             --border-color: #333333;
-            --input-bg: #222222;
+            --input-bg: #1a1a1a;
             --button-bg: #ffffff;
             --button-text: #000000;
-            --accent-color: #cccccc;
+            --accent-color: #ffffff;
             --shadow: rgba(255, 255, 255, 0.1);
+            --hover-bg: #222222;
+            --focus-ring: rgba(255, 255, 255, 0.2);
         }
 
         * {
             box-sizing: border-box;
         }
 
+        html {
+            scroll-behavior: smooth;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            padding: 0;
             background-color: var(--bg-color);
             color: var(--text-color);
             min-height: 100vh;
-            line-height: 1.6;
-            transition: all 0.3s ease;
+            line-height: 1.5;
+            font-weight: 400;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .header {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 0;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .header-btn {
+            background: var(--button-bg);
+            color: var(--button-text);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-btn:hover {
+            background: var(--hover-bg);
+            color: var(--text-color);
+        }
+
+        .btn-icon {
+            font-size: 0.875rem;
         }
 
         .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 32px 24px;
             background-color: var(--container-bg);
-            padding: 40px;
             border: 1px solid var(--border-color);
-            border-radius: 16px;
-            transition: all 0.3s ease;
+            margin-top: 0;
+            border-top: none;
         }
 
         h1 {
@@ -86,17 +118,17 @@
         }
 
         .lyrics-search-section {
-            margin-bottom: 30px;
-            padding: 25px;
-            background-color: var(--input-bg);
+            margin-bottom: 24px;
+            padding: 24px;
+            background-color: var(--container-bg);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 8px;
         }
 
         .lyrics-search-section h3 {
-            margin: 0 0 20px 0;
+            margin: 0 0 16px 0;
             color: var(--text-color);
-            font-size: 1.2rem;
+            font-size: 1.125rem;
             font-weight: 600;
         }
 
@@ -132,18 +164,20 @@
         .search-btn {
             background-color: var(--button-bg);
             color: var(--button-text);
-            padding: 12px 20px;
-            border: 1px solid var(--button-bg);
-            border-radius: 8px;
+            padding: 10px 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
+            font-size: 0.875rem;
+            font-weight: 500;
             transition: all 0.2s ease;
             white-space: nowrap;
+            line-height: 1.4;
         }
 
         .search-btn:hover {
-            opacity: 0.9;
+            background: var(--hover-bg);
+            color: var(--text-color);
         }
 
         .search-btn:disabled {
@@ -657,12 +691,281 @@
                 width: 100px;
             }
         }
+
+        /* Timing Sync Styles */
+        .timing-controls {
+            margin-top: 15px;
+        }
+
+        .audio-upload-label {
+            display: inline-block;
+            background-color: var(--input-bg);
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 15px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            color: var(--text-color);
+            margin: 10px 0;
+        }
+
+        .audio-upload-label:hover {
+            border-color: var(--accent-color);
+            background-color: var(--container-bg);
+        }
+
+        .sync-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            margin-top: 15px;
+        }
+
+        .sync-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .sync-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .sync-button-container {
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        /* Audio Method Selector Styles */
+        .audio-method-selector {
+            margin: 20px 0;
+        }
+
+        .audio-method-selector h4 {
+            color: var(--text-color);
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .audio-method-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .audio-method-btn {
+            background-color: var(--input-bg);
+            color: var(--text-color);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .audio-method-btn:hover {
+            border-color: var(--accent-color);
+            background-color: var(--container-bg);
+        }
+
+        .audio-method-btn.active {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .audio-search-status {
+            text-align: center;
+            padding: 15px;
+            background: var(--input-bg);
+            border-radius: 8px;
+            margin: 15px 0;
+            font-style: italic;
+            color: var(--text-secondary);
+        }
+
+        .youtube-player-container {
+            position: relative;
+            background: var(--container-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        #youtube-player {
+            width: 0;
+            height: 0;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .player-overlay {
+            color: var(--text-secondary);
+            font-style: italic;
+            font-size: 14px;
+        }
+
+        @media (max-width: 768px) {
+            .audio-method-buttons {
+                flex-direction: column;
+            }
+
+            .audio-method-btn {
+                width: 100%;
+            }
+        }
+
+        /* Fullscreen Presentation Mode */
+        .fullscreen-presentation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000000;
+            color: #ffffff;
+            z-index: 10000;
+            display: none;
+            overflow: hidden;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+        }
+
+        .presentation-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: hidden;
+        }
+
+        .presentation-line {
+            font-size: 2.5rem;
+            line-height: 1.4;
+            margin: 20px 0;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .presentation-line.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .presentation-word {
+            display: inline;
+            transition: all 0.3s ease;
+        }
+
+        .presentation-word.highlight {
+            background-color: var(--rhyme-color);
+            color: #ffffff;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            box-shadow: 0 0 15px rgba(255,255,255,0.3);
+            animation: highlightPulse 0.6s ease-out;
+        }
+
+        @keyframes highlightPulse {
+            0% { transform: scale(1); box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+            50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(255,255,255,0.6); }
+            100% { transform: scale(1); box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+        }
+
+        .presentation-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 50px;
+            padding: 15px 30px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .presentation-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .presentation-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.1s linear;
+            border-radius: 2px;
+        }
+
+        @media (max-width: 768px) {
+            .presentation-line {
+                font-size: 1.8rem;
+                margin: 15px 0;
+            }
+
+            .presentation-controls {
+                bottom: 20px;
+                padding: 10px 20px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .progress-bar {
+                width: 150px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Rhyme Scheme Analyzer</h1>
-        <button class="theme-toggle" onclick="toggleTheme()">Toggle Dark Mode</button>
+        <div class="header-controls">
+            <button class="header-btn sync-mode-btn" onclick="toggleTimingMode()" id="syncModeToggle">
+                <span class="btn-icon">🎵</span>
+                <span class="btn-text">Sync Mode</span>
+            </button>
+        </div>
     </div>
 
     <div class="container">
@@ -673,6 +976,58 @@
                 <input type="text" id="artistInput" placeholder="Artist name (e.g., Eminem)" />
                 <input type="text" id="songInput" placeholder="Song title (e.g., Lose Yourself)" />
                 <button class="search-btn" id="searchBtn" onclick="searchLyrics()">Search Lyrics</button>
+            </div>
+        </div>
+
+        <!-- Timed Lyrics Sync Section -->
+        <div class="lyrics-search-section" id="timedLyricsSection" style="display: block;">
+            <h3>🎵 Real-Time Sync Mode</h3>
+            <div class="timing-controls">
+                <div class="search-inputs">
+                    <input type="text" id="timedArtistInput" placeholder="Artist name" />
+                    <input type="text" id="timedSongInput" placeholder="Song title" />
+                    <button class="search-btn" id="timedSearchBtn" onclick="searchTimedLyrics()">Get Timed Lyrics</button>
+                </div>
+                <div class="audio-controls" id="audioControls" style="display: none;">
+                    <div class="audio-method-selector">
+                        <h4>Choose Audio Source:</h4>
+                        <div class="audio-method-buttons">
+                            <button class="audio-method-btn active" id="autoAudioBtn" onclick="selectAudioMethod('auto')">
+                                🎵 Auto Search YouTube
+                            </button>
+                            <button class="audio-method-btn" id="uploadAudioBtn" onclick="selectAudioMethod('upload')">
+                                📁 Upload File
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="auto-audio-section" id="autoAudioSection">
+                        <div class="audio-search-status" id="audioSearchStatus">
+                            <span>🔍 Searching for audio...</span>
+                        </div>
+                        <div class="youtube-player-container" id="youtubePlayerContainer" style="display: none;">
+                            <div id="youtube-player"></div>
+                            <div class="player-overlay">
+                                <span>YouTube Audio Player (Hidden)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="upload-audio-section" id="uploadAudioSection" style="display: none;">
+                        <div class="audio-upload">
+                            <label for="audioFile" class="audio-upload-label">
+                                <span>📁 Upload Audio File (MP3, WAV)</span>
+                                <input type="file" id="audioFile" accept="audio/*" style="display: none;" onchange="loadAudioFile(this)">
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="sync-button-container">
+                        <button class="sync-btn" id="syncPlayBtn" onclick="startSyncPresentation()" disabled>
+                            ▶️ Start Sync Presentation
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -746,6 +1101,28 @@ The magnificent different president, evident hesitant</textarea>
         <div id="error" class="error" style="display: none;"></div>
     </div>
 
+    <!-- Fullscreen Presentation Mode -->
+    <div class="fullscreen-presentation" id="presentationMode">
+        <div class="presentation-content">
+            <div id="presentationLines"></div>
+        </div>
+
+        <div class="presentation-controls">
+            <button class="presentation-btn" onclick="pausePresentation()" id="pauseBtn">⏸️ Pause</button>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span id="timeDisplay">00:00 / 00:00</span>
+            <button class="presentation-btn" onclick="exitPresentation()">✖️ Exit</button>
+        </div>
+    </div>
+
+    <!-- Hidden Audio Element -->
+    <audio id="syncAudio" preload="metadata"></audio>
+
+    <!-- YouTube iframe API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+
     <script>
         async function searchLyrics() {
             const artist = document.getElementById('artistInput').value.trim();
@@ -797,6 +1174,472 @@ The magnificent different president, evident hesitant</textarea>
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Search Lyrics';
+            }
+        }
+
+        // Global variables for timing sync
+        let currentTimingData = null;
+        let currentAnalysisData = null;
+        let audioElement = null;
+        let syncInterval = null;
+        let isPaused = false;
+        let youtubePlayer = null;
+        let currentAudioMethod = 'auto';
+        let lastSearchedArtist = '';
+        let lastSearchedSong = '';
+
+        // YouTube Player API Ready Callback
+        function onYouTubeIframeAPIReady() {
+            console.log('YouTube iframe API ready');
+            window.youtubeAPIReady = true;
+        }
+
+        function selectAudioMethod(method) {
+            currentAudioMethod = method;
+
+            // Update button states
+            document.getElementById('autoAudioBtn').classList.toggle('active', method === 'auto');
+            document.getElementById('uploadAudioBtn').classList.toggle('active', method === 'upload');
+
+            // Show/hide sections
+            document.getElementById('autoAudioSection').style.display = method === 'auto' ? 'block' : 'none';
+            document.getElementById('uploadAudioSection').style.display = method === 'upload' ? 'block' : 'none';
+
+            // If switching to auto mode and we have search data, search for audio
+            if (method === 'auto' && lastSearchedArtist && lastSearchedSong) {
+                searchYouTubeAudio(lastSearchedArtist, lastSearchedSong);
+            }
+
+            console.log('Audio method selected:', method);
+        }
+
+        async function searchYouTubeAudio(artist, song) {
+            const statusDiv = document.getElementById('audioSearchStatus');
+            statusDiv.innerHTML = '<span>🔍 Searching YouTube for audio...</span>';
+
+            try {
+                const searchQuery = `${artist} ${song}`;
+                console.log('Searching YouTube for:', searchQuery);
+
+                // Simulate search delay
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                // Search for video ID based on artist and song
+                const videoId = await getYouTubeVideoId(artist, song);
+
+                if (videoId) {
+                    statusDiv.innerHTML = `<span>✅ Found audio: "${song}" by ${artist}</span>`;
+                    loadYouTubePlayer(videoId);
+                } else {
+                    statusDiv.innerHTML = `<span>❌ No audio found for "${song}" by ${artist}. Try uploading a file or use a different song.</span>`;
+                    // Don't auto-switch to upload mode, let user decide
+                    console.warn('No matching video found for:', artist, song);
+
+                    // Show available songs as suggestions
+                    const availableSongs = getAvailableSongs();
+                    if (availableSongs.length > 0) {
+                        statusDiv.innerHTML += `<br><small>💡 Try these songs: ${availableSongs.slice(0, 3).join(', ')}</small>`;
+                    }
+                }
+
+            } catch (error) {
+                console.error('YouTube search error:', error);
+                statusDiv.innerHTML = '<span>❌ YouTube search failed. Try uploading a file.</span>';
+            }
+        }
+
+        function getAvailableSongs() {
+            // Return a list of available demo songs for suggestions
+            return [
+                'Eminem - Lose Yourself',
+                'Ed Sheeran - Shape of You',
+                'Drake - God\'s Plan',
+                'Taylor Swift - Shake It Off',
+                'Billie Eilish - Bad Guy',
+                'The Weeknd - Blinding Lights'
+            ];
+        }
+
+        async function getYouTubeVideoId(artist, song) {
+            console.log('Searching for video ID via API:', artist, song);
+
+            try {
+                // Call our backend API for YouTube search
+                const response = await fetch('/search-audio', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        artist: artist,
+                        song: song
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Audio search response:', data);
+
+                if (data.success && data.video_id) {
+                    console.log(`✓ Found video via ${data.source}:`, data.video_id);
+                    return data.video_id;
+                } else {
+                    console.warn('No video found via API:', data.error);
+                    return null;
+                }
+            } catch (error) {
+                console.error('API search failed:', error);
+                return null;
+            }
+        }
+
+        function loadYouTubePlayer(videoId) {
+            console.log('Loading YouTube player with video ID:', videoId);
+
+            const playerContainer = document.getElementById('youtubePlayerContainer');
+            playerContainer.style.display = 'block';
+
+            // Initialize YouTube player
+            if (window.YT && window.YT.Player) {
+                youtubePlayer = new YT.Player('youtube-player', {
+                    height: '0',
+                    width: '0',
+                    videoId: videoId,
+                    playerVars: {
+                        'autoplay': 0,
+                        'controls': 0,
+                        'disablekb': 1,
+                        'enablejsapi': 1,
+                        'fs': 0,
+                        'iv_load_policy': 3,
+                        'modestbranding': 1,
+                        'rel': 0,
+                        'showinfo': 0
+                    },
+                    events: {
+                        'onReady': onYouTubePlayerReady,
+                        'onStateChange': onYouTubePlayerStateChange
+                    }
+                });
+            } else {
+                // API not ready yet, wait and retry
+                setTimeout(() => loadYouTubePlayer(videoId), 500);
+            }
+        }
+
+        function onYouTubePlayerReady(event) {
+            console.log('YouTube player ready');
+            audioElement = {
+                play: () => youtubePlayer.playVideo(),
+                pause: () => youtubePlayer.pauseVideo(),
+                get currentTime() { return youtubePlayer.getCurrentTime(); },
+                set currentTime(time) { youtubePlayer.seekTo(time, true); },
+                get duration() { return youtubePlayer.getDuration(); },
+                get ended() { return youtubePlayer.getPlayerState() === YT.PlayerState.ENDED; }
+            };
+
+            // Enable sync button
+            document.getElementById('syncPlayBtn').disabled = false;
+        }
+
+        function onYouTubePlayerStateChange(event) {
+            // Handle player state changes if needed
+            console.log('YouTube player state changed:', event.data);
+        }
+
+        async function searchTimedLyrics() {
+            console.log('searchTimedLyrics function called');
+
+            const artist = document.getElementById('timedArtistInput').value.trim();
+            const song = document.getElementById('timedSongInput').value.trim();
+            const btn = document.getElementById('timedSearchBtn');
+            const errorDiv = document.getElementById('error');
+
+            console.log('Search params:', { artist, song });
+
+            if (!artist || !song) {
+                showError('Please enter both artist name and song title for timing sync.');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.textContent = 'Searching...';
+            errorDiv.style.display = 'none';
+
+            try {
+                console.log('Making fetch request to /search-timed-lyrics...');
+
+                const response = await fetch('/search-timed-lyrics', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ artist: artist, song: song })
+                });
+
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', { success: data.success, hasTimingData: !!data.timing_data, error: data.error });
+
+                if (data.success && data.timing_data) {
+                    currentTimingData = data.timing_data;
+                    lastSearchedArtist = data.artist;
+                    lastSearchedSong = data.song;
+                    console.log('Loaded timing data with', data.timing_data.length, 'items');
+
+                    // Populate text area with the lyrics text
+                    const lyricsText = data.timing_data.map(item => item.text).join('\n');
+                    document.getElementById('textInput').value = lyricsText;
+
+                    // Show audio controls
+                    document.getElementById('audioControls').style.display = 'block';
+
+                    // Auto-search for YouTube audio if in auto mode
+                    if (currentAudioMethod === 'auto') {
+                        searchYouTubeAudio(data.artist, data.song);
+                    }
+
+                    // Show success message
+                    showError(`✓ Found timed lyrics for "${data.song}" by ${data.artist}. Searching for audio...`);
+                    document.getElementById('error').style.backgroundColor = '#22c55e';
+                    document.getElementById('error').style.borderColor = '#22c55e';
+                    document.getElementById('error').style.color = '#ffffff';
+
+                    // Clear inputs
+                    document.getElementById('timedArtistInput').value = '';
+                    document.getElementById('timedSongInput').value = '';
+
+                } else {
+                    console.log('Search failed:', data.error);
+                    showError(data.error || 'No timed lyrics found for this song. Try different search terms.');
+                }
+
+            } catch (error) {
+                console.error('Search error:', error);
+                showError('Failed to search for timed lyrics. Make sure the server is running.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Get Timed Lyrics';
+            }
+        }
+
+        function loadAudioFile(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                audioElement = document.getElementById('syncAudio');
+
+                // Create object URL for local file
+                const audioURL = URL.createObjectURL(file);
+                audioElement.src = audioURL;
+
+                audioElement.onloadedmetadata = function() {
+                    // Enable the sync button once audio is loaded
+                    document.getElementById('syncPlayBtn').disabled = false;
+                    showError(`✓ Audio file loaded: ${file.name}. Ready to start sync presentation!`);
+                    document.getElementById('error').style.backgroundColor = '#22c55e';
+                    document.getElementById('error').style.borderColor = '#22c55e';
+                    document.getElementById('error').style.color = '#ffffff';
+                };
+
+                audioElement.onerror = function() {
+                    showError('Failed to load audio file. Please try a different audio format.');
+                };
+            }
+        }
+
+        async function startSyncPresentation() {
+            if (!currentTimingData || !audioElement) {
+                showError('Please load timed lyrics and audio file first.');
+                return;
+            }
+
+            // First analyze the lyrics for rhyme patterns
+            const lyricsText = currentTimingData.map(item => item.text).join('\n');
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        text: lyricsText,
+                        sensitivity: parseInt(document.getElementById('sensitivitySlider').value)
+                    })
+                });
+
+                currentAnalysisData = await response.json();
+
+                // Show fullscreen presentation
+                showFullscreenPresentation();
+
+            } catch (error) {
+                console.error('Error analyzing lyrics:', error);
+                showError('Failed to analyze lyrics for presentation.');
+            }
+        }
+
+        function showFullscreenPresentation() {
+            const presentationMode = document.getElementById('presentationMode');
+            const presentationLines = document.getElementById('presentationLines');
+
+            // Clear any existing content
+            presentationLines.innerHTML = '';
+
+            // Create presentation lines with timing data
+            currentTimingData.forEach((timingItem, index) => {
+                const lineDiv = document.createElement('div');
+                lineDiv.className = 'presentation-line';
+                lineDiv.id = `line-${index}`;
+                lineDiv.style.display = 'none';
+
+                // Split text into words for individual highlighting
+                const words = timingItem.text.split(' ');
+                const wordsHTML = words.map((word, wordIndex) => {
+                    return `<span class="presentation-word" id="word-${index}-${wordIndex}">${word}</span>`;
+                }).join(' ');
+
+                lineDiv.innerHTML = wordsHTML;
+                presentationLines.appendChild(lineDiv);
+            });
+
+            // Show presentation
+            presentationMode.style.display = 'block';
+
+            // Start audio and sync
+            audioElement.currentTime = 0;
+            audioElement.play();
+            isPaused = false;
+
+            startTimingSync();
+        }
+
+        function startTimingSync() {
+            let currentLineIndex = 0;
+            let nextTimestamp = currentTimingData[0]?.timestamp || 0;
+
+            syncInterval = setInterval(() => {
+                if (isPaused || !audioElement) return;
+
+                const currentTime = audioElement.currentTime * 1000; // Convert to milliseconds
+
+                // Update progress bar
+                const progress = (currentTime / (audioElement.duration * 1000)) * 100;
+                document.getElementById('progressFill').style.width = `${progress}%`;
+
+                // Update time display
+                const current = formatTime(audioElement.currentTime);
+                const total = formatTime(audioElement.duration);
+                document.getElementById('timeDisplay').textContent = `${current} / ${total}`;
+
+                // Check if we should show the next line
+                if (currentLineIndex < currentTimingData.length && currentTime >= nextTimestamp) {
+                    const timingItem = currentTimingData[currentLineIndex];
+
+                    // Hide previous lines (keep only current and next visible)
+                    if (currentLineIndex > 1) {
+                        const prevLine = document.getElementById(`line-${currentLineIndex - 2}`);
+                        if (prevLine) prevLine.style.display = 'none';
+                    }
+
+                    // Show current line
+                    const currentLine = document.getElementById(`line-${currentLineIndex}`);
+                    if (currentLine) {
+                        currentLine.style.display = 'block';
+                        currentLine.classList.add('active');
+
+                        // Add rhyme highlighting to words
+                        highlightRhymingWords(currentLineIndex, timingItem.text);
+                    }
+
+                    currentLineIndex++;
+                    nextTimestamp = currentTimingData[currentLineIndex]?.timestamp || Infinity;
+                }
+
+                // Auto-exit when audio ends
+                if (audioElement.ended) {
+                    exitPresentation();
+                }
+            }, 50); // Update every 50ms for smooth sync
+        }
+
+        function highlightRhymingWords(lineIndex, lineText) {
+            if (!currentAnalysisData?.syllable_highlights) return;
+
+            // Find matching highlights for this line
+            const words = lineText.split(' ');
+            words.forEach((word, wordIndex) => {
+                const wordElement = document.getElementById(`word-${lineIndex}-${wordIndex}`);
+                if (!wordElement) return;
+
+                // Look for rhyme data for this word
+                Object.values(currentAnalysisData.syllable_highlights).forEach(highlight => {
+                    if (highlight.word.toLowerCase().includes(word.toLowerCase())) {
+                        // Apply rhyme color
+                        const syllables = highlight.syllables || [];
+                        const rhymingSyllable = syllables.find(s => s.is_rhyming);
+                        if (rhymingSyllable) {
+                            wordElement.style.setProperty('--rhyme-color', rhymingSyllable.color);
+                            wordElement.classList.add('highlight');
+                        }
+                    }
+                });
+            });
+        }
+
+        function pausePresentation() {
+            if (audioElement) {
+                if (isPaused) {
+                    audioElement.play();
+                    document.getElementById('pauseBtn').textContent = '⏸️ Pause';
+                    isPaused = false;
+                } else {
+                    audioElement.pause();
+                    document.getElementById('pauseBtn').textContent = '▶️ Play';
+                    isPaused = true;
+                }
+            }
+        }
+
+        function exitPresentation() {
+            const presentationMode = document.getElementById('presentationMode');
+            presentationMode.style.display = 'none';
+
+            if (audioElement) {
+                audioElement.pause();
+                audioElement.currentTime = 0;
+            }
+
+            if (syncInterval) {
+                clearInterval(syncInterval);
+                syncInterval = null;
+            }
+
+            isPaused = false;
+        }
+
+        function formatTime(seconds) {
+            if (!seconds || isNaN(seconds)) return '00:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Add button to show/hide timing section
+        function toggleTimingMode() {
+            const section = document.getElementById('timedLyricsSection');
+            const toggleBtn = document.getElementById('syncModeToggle');
+            const isHidden = section.style.display === 'none' || getComputedStyle(section).display === 'none';
+
+            if (isHidden) {
+                section.style.display = 'block';
+                toggleBtn.style.background = 'var(--text-color)';
+                toggleBtn.style.color = 'var(--bg-color)';
+                console.log('Sync mode enabled');
+            } else {
+                section.style.display = 'none';
+                toggleBtn.style.background = 'var(--button-bg)';
+                toggleBtn.style.color = 'var(--button-text)';
+                console.log('Sync mode disabled');
             }
         }
 
@@ -1287,6 +2130,31 @@ The magnificent different president, evident hesitant</textarea>
                 const artistInput = document.getElementById('artistInput');
                 if (artistInput.value.trim()) {
                     searchLyrics();
+                } else {
+                    artistInput.focus();
+                }
+            }
+        });
+
+        // Timed lyrics input event listeners
+        document.getElementById('timedArtistInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const songInput = document.getElementById('timedSongInput');
+                if (songInput.value.trim()) {
+                    searchTimedLyrics();
+                } else {
+                    songInput.focus();
+                }
+            }
+        });
+
+        document.getElementById('timedSongInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const artistInput = document.getElementById('timedArtistInput');
+                if (artistInput.value.trim()) {
+                    searchTimedLyrics();
                 } else {
                     artistInput.focus();
                 }

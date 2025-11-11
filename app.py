@@ -8,6 +8,7 @@ import lyricsgenius
 import os
 from pathlib import Path
 from bs4 import BeautifulSoup
+import syncedlyrics
 
 app = Flask(__name__)
 CORS(app)
@@ -256,6 +257,369 @@ def scrape_genius_lyrics(song_url):
     except Exception as e:
         print(f"Error scraping lyrics: {e}")
         return None
+
+@app.route('/search-timed-lyrics', methods=['POST'])
+def search_timed_lyrics():
+    """Search for lyrics with timing data using LRC format"""
+    try:
+        data = request.get_json()
+        artist = data.get('artist', '').strip()
+        song = data.get('song', '').strip()
+
+        if not artist or not song:
+            return jsonify({'error': 'Artist and song name are required'}), 400
+
+        # Search for timed lyrics using syncedlyrics
+        search_query = f"{song} {artist}"
+        print(f"Searching for timed lyrics: {search_query}")
+
+        try:
+            lrc_content = syncedlyrics.search(search_query)
+
+            if lrc_content:
+                # Parse the LRC content
+                timing_data = parse_lrc_content(lrc_content)
+
+                if timing_data:
+                    return jsonify({
+                        'success': True,
+                        'artist': artist,
+                        'song': song,
+                        'lrc_content': lrc_content,
+                        'timing_data': timing_data,
+                        'word_count': len([item for item in timing_data if item.get('text', '').strip()])
+                    })
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Found LRC file but failed to parse timing data'
+                    }), 500
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'No timed lyrics found for "{song}" by {artist}'
+                }), 404
+
+        except Exception as e:
+            print(f"Error searching timed lyrics: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Failed to search timed lyrics: {str(e)}'
+            }), 500
+
+    except Exception as e:
+        print(f"Timed lyrics search error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Search failed: {str(e)}'
+        }), 500
+
+def parse_lrc_content(lrc_content):
+    """Parse LRC format content into timing data structure"""
+    try:
+        lines = lrc_content.strip().split('\n')
+        timing_data = []
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Match LRC format: [mm:ss.xx] or [mm:ss.xxx] followed by text
+            lrc_match = re.match(r'\[(\d{1,2}):(\d{2})\.(\d{2,3})\]\s*(.*)', line)
+
+            if lrc_match:
+                minutes = int(lrc_match.group(1))
+                seconds = int(lrc_match.group(2))
+                centiseconds = int(lrc_match.group(3).ljust(3, '0')[:3])  # Normalize to milliseconds
+                text = lrc_match.group(4).strip()
+
+                # Convert to total milliseconds
+                total_ms = (minutes * 60 * 1000) + (seconds * 1000) + centiseconds
+
+                timing_data.append({
+                    'timestamp': total_ms,
+                    'time_formatted': f"{minutes:02d}:{seconds:02d}.{centiseconds:03d}",
+                    'text': text,
+                    'words': text.split() if text else []
+                })
+
+        # Sort by timestamp to ensure proper order
+        timing_data.sort(key=lambda x: x['timestamp'])
+
+        return timing_data
+
+    except Exception as e:
+        print(f"Error parsing LRC content: {e}")
+        return None
+
+def merge_timing_with_analysis(analysis_result, timing_data):
+    """Merge timing data with rhyme analysis results"""
+    try:
+        if not timing_data or not analysis_result:
+            return analysis_result
+
+        # Create a mapping of text to timing
+        text_to_timing = {}
+        for item in timing_data:
+            if item.get('text'):
+                text_to_timing[item['text'].lower().strip()] = item
+
+        # Add timing data to analysis result
+        analysis_result['timing_data'] = timing_data
+        analysis_result['has_timing'] = True
+
+        # Try to match lines with timing data
+        timed_lines = []
+        for line_idx, line in enumerate(analysis_result.get('lines', [])):
+            line_clean = line.lower().strip()
+
+            # Find best matching timing entry
+            best_match = None
+            best_score = 0
+
+            for timing_item in timing_data:
+                timing_text = timing_item.get('text', '').lower().strip()
+                if timing_text and timing_text in line_clean:
+                    score = len(timing_text)
+                    if score > best_score:
+                        best_score = score
+                        best_match = timing_item
+
+            timed_lines.append({
+                'line_index': line_idx,
+                'text': line,
+                'timing': best_match
+            })
+
+        analysis_result['timed_lines'] = timed_lines
+
+        return analysis_result
+
+    except Exception as e:
+        print(f"Error merging timing with analysis: {e}")
+        return analysis_result
+
+def load_youtube_api_key():
+    """Load YouTube API key from environment or .env file"""
+    # Try environment variable first
+    api_key = os.getenv('YOUTUBE_API_KEY')
+    if api_key:
+        return api_key
+
+    # Try to load from .env file
+    env_file = Path('.env')
+    if env_file.exists():
+        with open(env_file, 'r') as f:
+            for line in f:
+                if line.startswith('YOUTUBE_API_KEY='):
+                    return line.split('=', 1)[1].strip()
+
+    return None
+
+# Load YouTube API key
+youtube_api_key = load_youtube_api_key()
+if youtube_api_key:
+    print(f"✓ YouTube API key loaded: {youtube_api_key[:10]}...{youtube_api_key[-10:]}")
+else:
+    print("⚠ Warning: No YouTube API key found. Using fallback database only.")
+
+@app.route('/search-audio', methods=['POST'])
+def search_audio():
+    """Search for audio/video sources for a song using YouTube Data API v3"""
+    try:
+        data = request.get_json()
+        artist = data.get('artist', '').strip()
+        song = data.get('song', '').strip()
+
+        if not artist or not song:
+            return jsonify({'error': 'Artist and song name are required'}), 400
+
+        # Search for YouTube video
+        search_query = f"{artist} {song}"
+        print(f"Searching YouTube for: {search_query}")
+
+        # Check if YouTube API is available
+        if not youtube_api_key:
+            print("⚠ Warning: No YouTube API key found. Using fallback hardcoded database.")
+            return fallback_youtube_search(artist, song, search_query)
+
+        try:
+            # Use YouTube Data API v3 for search
+            youtube_search_url = "https://www.googleapis.com/youtube/v3/search"
+
+            params = {
+                'part': 'snippet',
+                'q': search_query,
+                'type': 'video',
+                'maxResults': 5,
+                'order': 'relevance',
+                'key': youtube_api_key
+            }
+
+            response = requests.get(youtube_search_url, params=params, timeout=10)
+            response.raise_for_status()
+
+            search_results = response.json()
+            items = search_results.get('items', [])
+
+            if not items:
+                print(f"No YouTube results found for: {search_query}")
+                return fallback_youtube_search(artist, song, search_query)
+
+            # Find the best match
+            best_video = None
+            for item in items:
+                video_title = item['snippet']['title'].lower()
+                video_channel = item['snippet']['channelTitle'].lower()
+
+                # Look for official content or high-quality matches
+                if ('official' in video_title or
+                    'official' in video_channel or
+                    (artist.lower() in video_title and song.lower() in video_title)):
+                    best_video = item
+                    break
+
+            # If no official video found, use the first result
+            if not best_video:
+                best_video = items[0]
+
+            video_id = best_video['id']['videoId']
+            video_title = best_video['snippet']['title']
+            channel_title = best_video['snippet']['channelTitle']
+
+            print(f"✓ Found YouTube video: {video_title} by {channel_title} (ID: {video_id})")
+
+            return jsonify({
+                'success': True,
+                'artist': artist,
+                'song': song,
+                'video_id': video_id,
+                'video_title': video_title,
+                'channel_title': channel_title,
+                'search_query': search_query,
+                'source': 'youtube_api'
+            })
+
+        except requests.exceptions.RequestException as e:
+            print(f"YouTube API request failed: {e}")
+            return fallback_youtube_search(artist, song, search_query)
+        except Exception as e:
+            print(f"YouTube API error: {e}")
+            return fallback_youtube_search(artist, song, search_query)
+
+    except Exception as e:
+        print(f"Audio search error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Search failed: {str(e)}'
+        }), 500
+
+def fallback_youtube_search(artist, song, search_query):
+    """Fallback function when YouTube API is not available or quota exceeded"""
+    # Expanded hardcoded database for common songs
+    demo_video_ids = {
+        'eminem lose yourself': '_Yhyp-_hX2s',
+        'ed sheeran shape of you': 'JGwWNGJdvx8',
+        'drake gods plan': 'xpVfcZ0ZcFM',
+        'post malone circles': 'wXhTHyIgQ_U',
+        'post malone better now': 'ne_Idgqz_aw',
+        'billie eilish bad guy': 'DyDfgMOUjCI',
+        'ariana grande 7 rings': 'QYh6mYIJG2Y',
+        'travis scott sicko mode': '6ONRf7h3Mdk',
+        'kendrick lamar humble': 'tvTRZJ-4EyI',
+        'the weeknd blinding lights': '4NRXx6U8ABQ',
+        'dua lipa dont start now': 'oygrmJFKYZY',
+        'dua lipa levitating': 'TUVcZfQe-Kw',
+        'justin bieber sorry': 'fRh_vgS2dFE',
+        'taylor swift shake it off': 'nfWlot6h_JM',
+        'bruno mars uptown funk': 'OPf0YbXqDm0',
+        'pharrell williams happy': 'ZbZSe6N_BXs',
+        'adele hello': 'YQHsXMglC9A',
+        'imagine dragons believer': 'W0DM5lcj6mw',
+        'maroon 5 sugar': '09R8_2nJtjg',
+        'clean bandit rather be': 'm-M1AtrxztU',
+        'charlie puth see you again': 'RgKAFK5djSk',
+        'onerepublic counting stars': 'hT_nvWreIhg',
+        'avicii wake me up': 'IcrbM1l_BoI',
+        'calvin harris feel so close': 'dGghkjpNCQ8',
+        'david guetta titanium': 'JRfuAukYTKg',
+        'rihanna diamonds': 'lWA2pjMjpBs',
+        'katy perry roar': 'CevxZvSJLk8'
+    }
+
+    # Try to find a match
+    search_key = f"{artist.lower()} {song.lower()}"
+
+    # Direct match
+    if search_key in demo_video_ids:
+        video_id = demo_video_ids[search_key]
+        return jsonify({
+            'success': True,
+            'artist': artist,
+            'song': song,
+            'video_id': video_id,
+            'video_title': f"{song} - {artist}",
+            'channel_title': artist,
+            'search_query': search_query,
+            'source': 'hardcoded_fallback',
+            'message': 'Using fallback database - limited song selection available'
+        })
+
+    # Try partial matches - strict scoring based on word similarity
+    best_match = None
+    best_score = 0
+
+    for key, video_id in demo_video_ids.items():
+        key_parts = key.split()
+        artist_part = ' '.join(key_parts[:2])  # First 2 words usually artist
+        song_part = ' '.join(key_parts[2:])    # Rest is song title
+
+        # Calculate exact word matches
+        artist_match = 0
+        song_match = 0
+
+        # Check artist similarity (require significant match)
+        artist_words_clean = [w.lower() for w in artist.split()]
+        for artist_word in artist_words_clean:
+            if len(artist_word) > 2 and artist_word in artist_part:
+                artist_match += 1
+
+        # Check song similarity (require significant match)
+        song_words_clean = [w.lower() for w in song.split()]
+        for song_word in song_words_clean:
+            if len(song_word) > 2 and song_word in song_part:
+                song_match += 1
+
+        # Require both artist AND song matches for partial match
+        if artist_match > 0 and song_match > 0:
+            score = (artist_match * 10) + (song_match * 20)  # Prioritize song matches
+
+            if score > best_score:
+                best_score = score
+                best_match = (key, video_id)
+
+    if best_match:
+        key, video_id = best_match
+        return jsonify({
+            'success': True,
+            'artist': artist,
+            'song': song,
+            'video_id': video_id,
+            'video_title': f"{song} - {artist} (similar match)",
+            'channel_title': artist,
+            'search_query': search_query,
+            'source': 'hardcoded_fallback',
+            'message': f'Using similar match from fallback database'
+        })
+
+    # No match found
+    return jsonify({
+        'success': False,
+        'error': f'Song "{song}" by {artist} not found in fallback database. Configure YouTube API for unlimited search.',
+        'search_query': search_query,
+        'source': 'hardcoded_fallback'
+    }), 404
 
 def clean_word(word):
     """Remove punctuation and convert to lowercase"""
