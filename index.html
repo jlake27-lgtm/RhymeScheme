@@ -847,29 +847,35 @@
 
         .presentation-content {
             position: absolute;
-            top: 50%;
+            top: 0;
             left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            max-width: 90vw;
-            max-height: 90vh;
+            transform: translateX(-50%);
+            text-align: left;
+            width: 90vw;
+            height: 100vh;
             overflow: hidden;
+            padding: 100px 0;
+            transition: transform 0.3s ease-out;
         }
 
         .presentation-line {
             font-size: 2.5rem;
-            line-height: 1.4;
-            margin: 20px 0;
-            opacity: 0;
-            transform: translateY(30px);
-            transition: all 0.8s ease;
+            line-height: 1.6;
+            margin: 25px 0;
+            opacity: 0.4;
+            transition: opacity 0.3s ease;
             white-space: pre-wrap;
             word-wrap: break-word;
+            display: block;
         }
 
         .presentation-line.active {
             opacity: 1;
-            transform: translateY(0);
+        }
+
+        .presentation-line.current {
+            opacity: 1;
+            font-weight: 600;
         }
 
         .presentation-word {
@@ -877,20 +883,20 @@
             transition: all 0.3s ease;
         }
 
-        .presentation-word.highlight {
-            background-color: var(--rhyme-color);
-            color: #ffffff;
-            padding: 3px 6px;
-            border-radius: 4px;
-            font-weight: bold;
-            box-shadow: 0 0 15px rgba(255,255,255,0.3);
-            animation: highlightPulse 0.6s ease-out;
-        }
-
-        @keyframes highlightPulse {
-            0% { transform: scale(1); box-shadow: 0 0 15px rgba(255,255,255,0.3); }
-            50% { transform: scale(1.1); box-shadow: 0 0 25px rgba(255,255,255,0.6); }
-            100% { transform: scale(1); box-shadow: 0 0 15px rgba(255,255,255,0.3); }
+        /* Highest priority presentation highlight - overrides everything */
+        .fullscreen-presentation .karaoke-highlight,
+        .karaoke-highlight {
+            background: #ffffff !important;
+            color: #000000 !important;
+            padding: 4px 8px !important;
+            border-radius: 0 !important;
+            font-weight: 700 !important;
+            border: 2px solid #ffffff !important;
+            box-shadow: none !important;
+            position: relative !important;
+            transition: none !important;
+            display: inline-block !important;
+            z-index: 9999 !important;
         }
 
         .presentation-controls {
@@ -936,6 +942,26 @@
             width: 0%;
             transition: width 0.1s linear;
             border-radius: 2px;
+        }
+
+        .presentation-content.zoomed-out {
+            transition: transform 1s ease-out;
+        }
+
+        .presentation-line.timing-ended {
+            opacity: 0.6;
+            position: relative;
+        }
+
+        .presentation-line.timing-ended::after {
+            content: "🎵 Audio continues...";
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1rem;
+            opacity: 0.7;
+            font-style: italic;
         }
 
         @media (max-width: 768px) {
@@ -1051,10 +1077,10 @@ The magnificent different president, evident hesitant</textarea>
                        class="sensitivity-slider"
                        min="0"
                        max="100"
-                       value="70"
+                       value="5"
                        oninput="updateSensitivity(this.value)"
                        onchange="reanalyzeWithSensitivity()">
-                <span class="sensitivity-value" id="sensitivityValue">70%</span>
+                <span class="sensitivity-value" id="sensitivityValue">5%</span>
             </div>
             <button class="analyze-btn" id="analyzeBtn" onclick="analyzeRhymes()">Analyze Rhyme Scheme</button>
         </div>
@@ -1179,7 +1205,8 @@ The magnificent different president, evident hesitant</textarea>
 
         // Global variables for timing sync
         let currentTimingData = null;
-        let currentAnalysisData = null;
+        let currentAnalysisData = null; // For karaoke presentation
+        let mainAnalysisData = null;    // For main rhyme analysis
         let audioElement = null;
         let syncInterval = null;
         let isPaused = false;
@@ -1452,9 +1479,25 @@ The magnificent different president, evident hesitant</textarea>
                 return;
             }
 
-            // First analyze the lyrics for rhyme patterns
-            const lyricsText = currentTimingData.map(item => item.text).join('\n');
+            // Check if we have existing analysis to reuse
+            if (mainAnalysisData) {
+                console.log('🎯 Reusing existing rhyme analysis for karaoke mode');
+                currentAnalysisData = mainAnalysisData;
+                showFullscreenPresentation();
+                return;
+            }
 
+            // If no existing analysis, check if current text matches timing data
+            const lyricsText = currentTimingData.map(item => item.text).join('\n');
+            const currentText = document.getElementById('textInput').value.trim();
+
+            if (currentText && currentText === lyricsText) {
+                showError('Please click "Analyze Rhyme Scheme" first to generate the rhyme analysis.');
+                return;
+            }
+
+            // As fallback, analyze the lyrics for rhyme patterns
+            console.log('⚠️ No existing analysis found, generating new one...');
             try {
                 const response = await fetch('/analyze', {
                     method: 'POST',
@@ -1468,6 +1511,7 @@ The magnificent different president, evident hesitant</textarea>
                 });
 
                 currentAnalysisData = await response.json();
+                console.log('✅ Generated fallback analysis for karaoke mode');
 
                 // Show fullscreen presentation
                 showFullscreenPresentation();
@@ -1485,17 +1529,18 @@ The magnificent different president, evident hesitant</textarea>
             // Clear any existing content
             presentationLines.innerHTML = '';
 
-            // Create presentation lines with timing data
+            // Create ALL presentation lines at once (karaoke style - all visible from start)
             currentTimingData.forEach((timingItem, index) => {
                 const lineDiv = document.createElement('div');
                 lineDiv.className = 'presentation-line';
                 lineDiv.id = `line-${index}`;
-                lineDiv.style.display = 'none';
+                lineDiv.dataset.timestamp = timingItem.timestamp;
 
                 // Split text into words for individual highlighting
                 const words = timingItem.text.split(' ');
                 const wordsHTML = words.map((word, wordIndex) => {
-                    return `<span class="presentation-word" id="word-${index}-${wordIndex}">${word}</span>`;
+                    const cleanWord = word.replace(/[.,!?;:]/g, '');
+                    return `<span class="presentation-word" id="word-${index}-${wordIndex}" data-word="${cleanWord}">${word}</span>`;
                 }).join(' ');
 
                 lineDiv.innerHTML = wordsHTML;
@@ -1510,59 +1555,108 @@ The magnificent different president, evident hesitant</textarea>
             audioElement.play();
             isPaused = false;
 
-            startTimingSync();
+            startKaraokeSync();
         }
 
-        function startTimingSync() {
+        function startKaraokeSync() {
             let currentLineIndex = 0;
             let nextTimestamp = currentTimingData[0]?.timestamp || 0;
+            const presentationContent = document.querySelector('.presentation-content');
+            let hasInitialScrolled = false;
 
             syncInterval = setInterval(() => {
-                if (isPaused || !audioElement) return;
+                if (isPaused || !audioElement) {
+                    console.log('⏸️ Sync paused:', {isPaused, audioElement: !!audioElement});
+                    return;
+                }
 
                 const currentTime = audioElement.currentTime * 1000; // Convert to milliseconds
+                const duration = audioElement.duration * 1000;
+
+                // Check for audio errors or corruption
+                if (!audioElement.duration || audioElement.duration === 0) {
+                    console.warn('⚠️ Audio duration is 0 or undefined');
+                    return;
+                }
 
                 // Update progress bar
-                const progress = (currentTime / (audioElement.duration * 1000)) * 100;
-                document.getElementById('progressFill').style.width = `${progress}%`;
+                const progress = (currentTime / duration) * 100;
+                document.getElementById('progressFill').style.width = `${Math.min(progress, 100)}%`;
 
                 // Update time display
                 const current = formatTime(audioElement.currentTime);
                 const total = formatTime(audioElement.duration);
                 document.getElementById('timeDisplay').textContent = `${current} / ${total}`;
 
-                // Check if we should show the next line
+                // Debug timing info (every 5 seconds to reduce spam)
+                if (Math.floor(currentTime / 5000) !== Math.floor((currentTime - 50) / 5000)) {
+                    console.log(`🎵 Sync: ${currentTime.toFixed(0)}ms | Line: ${currentLineIndex}/${currentTimingData.length} | Next: ${nextTimestamp} | Duration: ${duration.toFixed(0)}ms`);
+                }
+
+                // Check if we should highlight the next line
                 if (currentLineIndex < currentTimingData.length && currentTime >= nextTimestamp) {
                     const timingItem = currentTimingData[currentLineIndex];
-
-                    // Hide previous lines (keep only current and next visible)
-                    if (currentLineIndex > 1) {
-                        const prevLine = document.getElementById(`line-${currentLineIndex - 2}`);
-                        if (prevLine) prevLine.style.display = 'none';
-                    }
-
-                    // Show current line
                     const currentLine = document.getElementById(`line-${currentLineIndex}`);
-                    if (currentLine) {
-                        currentLine.style.display = 'block';
-                        currentLine.classList.add('active');
 
-                        // Add rhyme highlighting to words
-                        highlightRhymingWords(currentLineIndex, timingItem.text);
+                    console.log(`✨ Activating line ${currentLineIndex}: "${timingItem.text}"`);
+
+                    // Remove current class from previous line
+                    document.querySelectorAll('.presentation-line.current').forEach(line => {
+                        line.classList.remove('current');
+                    });
+
+                    // Add current class to current line
+                    if (currentLine) {
+                        currentLine.classList.add('current');
+
+                        // Smooth scroll to keep current line centered
+                        const lineHeight = currentLine.offsetHeight + 25; // including margin
+                        const containerHeight = window.innerHeight;
+                        const scrollPosition = -(currentLineIndex * lineHeight - containerHeight / 2 + lineHeight / 2);
+
+                        presentationContent.style.transform = `translateX(-50%) translateY(${scrollPosition}px)`;
+
+                        // Add rhyme highlighting to words abruptly
+                        highlightRhymingWordsAbrupt(currentLineIndex, timingItem.text);
                     }
 
                     currentLineIndex++;
                     nextTimestamp = currentTimingData[currentLineIndex]?.timestamp || Infinity;
                 }
 
-                // Auto-exit when audio ends
-                if (audioElement.ended) {
-                    exitPresentation();
+                // When audio actually ends (not just paused), zoom out to show entire scheme
+                // But only if we're really near the end (within 3 seconds) or audio has truly ended
+                const timeRemaining = duration - currentTime;
+                if ((audioElement.ended && !audioElement.seeking) || timeRemaining <= 3000) {
+                    if (currentLineIndex >= currentTimingData.length || audioElement.ended) {
+                        console.log(`🏁 Audio ending (${timeRemaining.toFixed(0)}ms remaining), showing full scheme`);
+                        clearInterval(syncInterval);
+                        zoomOutToFullScheme();
+                    }
+                }
+
+                // Safety check: if we've gone through all timing data but audio is still playing
+                if (currentLineIndex >= currentTimingData.length && timeRemaining > 10000) {
+                    // Show a message that timing data has ended but audio continues
+                    const timingEndTime = Math.floor(currentTime / 1000);
+                    const totalTime = Math.floor(duration / 1000);
+
+                    if (Math.floor(currentTime / 10000) !== Math.floor((currentTime - 50) / 10000)) {
+                        console.log(`📜 Timing data ended at ${timingEndTime}s, but audio continues to ${totalTime}s (${timeRemaining.toFixed(0)}ms remaining)`);
+                    }
+
+                    // Keep the last line visible and highlighted
+                    const lastLine = document.querySelector('.presentation-line.current');
+                    if (lastLine) {
+                        lastLine.classList.add('timing-ended');
+                    }
+
+                    // Continue playing without new highlights
                 }
             }, 50); // Update every 50ms for smooth sync
         }
 
-        function highlightRhymingWords(lineIndex, lineText) {
+        function highlightRhymingWordsAbrupt(lineIndex, lineText) {
             if (!currentAnalysisData?.syllable_highlights) return;
 
             // Find matching highlights for this line
@@ -1571,19 +1665,78 @@ The magnificent different president, evident hesitant</textarea>
                 const wordElement = document.getElementById(`word-${lineIndex}-${wordIndex}`);
                 if (!wordElement) return;
 
-                // Look for rhyme data for this word
+                const cleanWord = word.replace(/[.,!?;:()\[\]"']/g, '').toLowerCase();
+
+                // Look for rhyme data for this word - be more strict about matching
                 Object.values(currentAnalysisData.syllable_highlights).forEach(highlight => {
-                    if (highlight.word.toLowerCase().includes(word.toLowerCase())) {
-                        // Apply rhyme color
-                        const syllables = highlight.syllables || [];
-                        const rhymingSyllable = syllables.find(s => s.is_rhyming);
-                        if (rhymingSyllable) {
-                            wordElement.style.setProperty('--rhyme-color', rhymingSyllable.color);
-                            wordElement.classList.add('highlight');
-                        }
+                    const highlightWord = highlight.word.toLowerCase();
+                    // Only highlight if it's an exact match
+                    if (highlightWord === cleanWord) {
+                        // First, remove ALL existing classes that might conflict
+                        wordElement.className = 'presentation-word';
+
+                        // Remove any existing styles that might conflict
+                        wordElement.removeAttribute('style');
+
+                        // Get the rhyme group color from the highlight data
+                        const backgroundColor = highlight.syllables?.[0]?.color || '#ff6b6b';
+
+                        // Apply our karaoke highlight with the proper color
+                        wordElement.classList.add('karaoke-highlight');
+
+                        // Force inline styles with the rhyme group color
+                        wordElement.setAttribute('style', `
+                            background: ${backgroundColor} !important;
+                            color: #ffffff !important;
+                            padding: 4px 8px !important;
+                            border-radius: 0 !important;
+                            font-weight: 700 !important;
+                            border: 2px solid ${backgroundColor} !important;
+                            box-shadow: none !important;
+                            display: inline-block !important;
+                            position: relative !important;
+                            z-index: 9999 !important;
+                        `);
+
+                        console.log(`✅ Karaoke highlighting: ${cleanWord} with color ${backgroundColor} at line ${lineIndex}, word ${wordIndex}`, wordElement);
                     }
                 });
             });
+        }
+
+        function zoomOutToFullScheme() {
+            console.log('🔍 Zooming out to show full rhyme scheme');
+            const presentationContent = document.querySelector('.presentation-content');
+
+            // Calculate the total height of all lines
+            const lines = document.querySelectorAll('.presentation-line');
+            let totalHeight = 0;
+            lines.forEach(line => {
+                totalHeight += line.offsetHeight + 25; // including margin
+            });
+
+            // Calculate scale to fit all content
+            const containerHeight = window.innerHeight - 200; // leave space for controls
+            const scale = Math.min(1, containerHeight / totalHeight);
+
+            console.log(`📏 Zoom scale: ${scale}, total height: ${totalHeight}px`);
+
+            // Apply zoom out transformation
+            presentationContent.style.transform = `translateX(-50%) translateY(${-totalHeight/4}px) scale(${scale})`;
+
+            // Add a class to show this is the final view
+            presentationContent.classList.add('zoomed-out');
+
+            // Show all lines at once for the finale
+            lines.forEach(line => {
+                line.classList.add('current');
+            });
+
+            // Auto-exit after showing full scheme for 5 seconds (increased from 3)
+            setTimeout(() => {
+                console.log('👋 Exiting presentation after zoom out');
+                exitPresentation();
+            }, 5000);
         }
 
         function pausePresentation() {
@@ -1602,11 +1755,35 @@ The magnificent different president, evident hesitant</textarea>
 
         function exitPresentation() {
             const presentationMode = document.getElementById('presentationMode');
+            const presentationContent = document.querySelector('.presentation-content');
+
             presentationMode.style.display = 'none';
+
+            // Reset presentation state
+            if (presentationContent) {
+                presentationContent.style.transform = 'translateX(-50%)';
+                presentationContent.classList.remove('zoomed-out');
+            }
+
+            // Clear all line states
+            document.querySelectorAll('.presentation-line').forEach(line => {
+                line.classList.remove('current', 'active');
+            });
+
+            // Clear all highlight states
+            document.querySelectorAll('.karaoke-highlight').forEach(word => {
+                word.classList.remove('karaoke-highlight');
+                word.removeAttribute('style');
+                word.className = 'presentation-word';
+            });
 
             if (audioElement) {
                 audioElement.pause();
                 audioElement.currentTime = 0;
+            }
+            if (youtubePlayer && youtubePlayer.pauseVideo) {
+                youtubePlayer.pauseVideo();
+                youtubePlayer.seekTo(0);
             }
 
             if (syncInterval) {
@@ -1690,6 +1867,11 @@ The magnificent different president, evident hesitant</textarea>
                 }
 
                 const data = await response.json();
+
+                // Store the analysis globally for reuse in karaoke mode
+                mainAnalysisData = data;
+                console.log('✅ Main analysis completed and stored', mainAnalysisData);
+
                 displayResults(data);
 
             } catch (error) {

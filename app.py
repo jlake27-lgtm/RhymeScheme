@@ -274,20 +274,96 @@ def search_timed_lyrics():
         print(f"Searching for timed lyrics: {search_query}")
 
         try:
-            lrc_content = syncedlyrics.search(search_query)
+            print(f"🔍 Searching LRC timing data for: '{search_query}'")
+
+            # Try different providers to get better timing data
+            providers_to_try = [
+                ('musixmatch', True),  # Try enhanced mode first
+                ('lrclib', False),
+                ('netease', False),
+                ('genius', False)
+            ]
+            lrc_content = None
+            used_provider = None
+
+            for provider, enhanced in providers_to_try:
+                try:
+                    print(f"  Trying provider: {provider} (enhanced: {enhanced})")
+                    if provider == 'musixmatch' and enhanced:
+                        # Try enhanced mode for word-level timing
+                        lrc_content = syncedlyrics.search(search_query, providers=[provider], enhanced=True)
+                    else:
+                        lrc_content = syncedlyrics.search(search_query, providers=[provider])
+
+                    if lrc_content and len(lrc_content.strip()) > 100:  # Minimum content check
+                        used_provider = f"{provider}{'_enhanced' if enhanced else ''}"
+                        print(f"  ✓ Success with {provider} (enhanced: {enhanced})")
+                        break
+                    else:
+                        print(f"  ✗ {provider} returned insufficient data")
+                except Exception as e:
+                    print(f"  ✗ {provider} failed: {e}")
+                    continue
+
+            # Fallback to default search if no specific provider worked
+            if not lrc_content:
+                print("  Trying default search...")
+                lrc_content = syncedlyrics.search(search_query)
+                used_provider = "default"
 
             if lrc_content:
+                print(f"✓ Found LRC data ({len(lrc_content)} characters)")
+                # Show first few lines of raw LRC data for debugging
+                lrc_lines = lrc_content.split('\n')[:10]
+                print("Raw LRC preview:")
+                for i, line in enumerate(lrc_lines):
+                    if line.strip():
+                        print(f"  Line {i+1}: '{line.strip()}'")
+                print("  ...")
+
+                # Also check if this looks like malformed LRC
+                sample_text = ' '.join(lrc_lines[:5])
+                if '<' in sample_text and '>' in sample_text and ':' in sample_text:
+                    print("  ⚠️ WARNING: LRC content appears to contain malformed timing markers")
+                    # Check if most of the content is just timing markers
+                    timing_markers = len(re.findall(r'<\d{1,2}:\d{2}\.\d{2,3}>', lrc_content))
+                    actual_words = len(re.findall(r'[a-zA-Z]{3,}', lrc_content))
+                    if timing_markers > actual_words:
+                        print("  ❌ LRC data is mostly timing markers - will try to get clean lyrics instead")
+                        return get_clean_lyrics_fallback(artist, song)
                 # Parse the LRC content
                 timing_data = parse_lrc_content(lrc_content)
 
                 if timing_data:
+                    last_timestamp = timing_data[-1].get('timestamp', 0) if timing_data else 0
+                    duration_seconds = last_timestamp/1000
+
+                    # If timing data is very short (< 90 seconds), supplement with estimated timing
+                    if duration_seconds < 90:
+                        print(f"  ⚠️ Timing data too short ({duration_seconds:.1f}s), supplementing with estimated timing")
+                        timing_data = supplement_timing_data(timing_data, lrc_content, search_query)
+
+                if timing_data:
+                    print(f"✓ Parsed {len(timing_data)} timing entries for {artist} - {song} (via {used_provider})")
+                    if timing_data:
+                        print(f"  First entry: {timing_data[0]}")
+                        print(f"  Last entry: {timing_data[-1]}")
+                        last_timestamp = timing_data[-1].get('timestamp', 0) if timing_data else 0
+                        duration_seconds = last_timestamp/1000
+                        print(f"  Song duration from timing data: {duration_seconds:.1f} seconds")
+
+                        # Warn if timing data seems too short (less than 2 minutes)
+                        if duration_seconds < 120:
+                            print(f"  ⚠️ WARNING: Timing data seems short ({duration_seconds:.1f}s) - may not cover full song")
+
                     return jsonify({
                         'success': True,
                         'artist': artist,
                         'song': song,
                         'lrc_content': lrc_content,
                         'timing_data': timing_data,
-                        'word_count': len([item for item in timing_data if item.get('text', '').strip()])
+                        'word_count': len([item for item in timing_data if item.get('text', '').strip()]),
+                        'provider': used_provider
                     })
                 else:
                     return jsonify({
@@ -314,6 +390,144 @@ def search_timed_lyrics():
             'error': f'Search failed: {str(e)}'
         }), 500
 
+def get_clean_lyrics_fallback(artist, song):
+    """Get clean lyrics from Genius and create basic timing data"""
+    try:
+        if not genius:
+            return jsonify({
+                'success': False,
+                'error': 'Cannot get clean lyrics - Genius API not available'
+            }), 500
+
+        print(f"  🔄 Fetching clean lyrics from Genius for {artist} - {song}")
+
+        # Search for the song using direct Genius API
+        search_query = f"{song} {artist}"
+        search_url = f"https://api.genius.com/search?q={quote(search_query)}"
+        headers = {
+            'Authorization': f'Bearer {genius_token}',
+            'User-Agent': 'RhymeScheme'
+        }
+
+        search_response = requests.get(search_url, headers=headers, timeout=10)
+        search_response.raise_for_status()
+        search_data = search_response.json()
+        hits = search_data.get('response', {}).get('hits', [])
+
+        if not hits:
+            return jsonify({
+                'success': False,
+                'error': 'No clean lyrics found'
+            }), 404
+
+        # Get the first result
+        song_info = hits[0]['result']
+        song_url = song_info['url']
+
+        # Fetch lyrics using requests and BeautifulSoup
+        lyrics_response = requests.get(song_url, timeout=10)
+        lyrics_response.raise_for_status()
+
+        soup = BeautifulSoup(lyrics_response.text, 'html.parser')
+        lyrics_div = soup.find('div', {'data-lyrics-container': 'true'}) or soup.find('div', class_='lyrics')
+
+        if lyrics_div:
+            lyrics_text = lyrics_div.get_text('\n').strip()
+
+            # Create basic timing data (estimate 3 seconds per line)
+            lines = [line.strip() for line in lyrics_text.split('\n') if line.strip()]
+            timing_data = []
+
+            for i, line in enumerate(lines):
+                if line:  # Skip empty lines
+                    timestamp = i * 3000  # 3 seconds per line
+                    timing_data.append({
+                        'timestamp': timestamp,
+                        'time_formatted': format_timestamp(timestamp),
+                        'text': line,
+                        'words': line.split(),
+                        'estimated': True
+                    })
+
+            return jsonify({
+                'success': True,
+                'artist': artist,
+                'song': song,
+                'lrc_content': f"Generated from clean lyrics\n{lyrics_text}",
+                'timing_data': timing_data,
+                'word_count': len([item for item in timing_data if item.get('text', '').strip()]),
+                'provider': 'genius_fallback'
+            })
+
+    except Exception as e:
+        print(f"  ❌ Clean lyrics fallback failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to get clean lyrics: {str(e)}'
+        }), 500
+
+def supplement_timing_data(timing_data, lrc_content, search_query):
+    """Supplement short timing data with estimated timing for full song"""
+    try:
+        # Get the original lyrics from LRC
+        lines = lrc_content.strip().split('\n')
+        all_text_lines = []
+
+        # Extract all lyric lines (ignore timing for now)
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('['):
+                # Remove all timing markers (both [mm:ss.xx] and <mm:ss.xx> formats)
+                text_part = re.sub(r'[\[<][\d:.]+[\]>]', '', line).strip()
+                # Also remove standalone timing markers
+                text_part = re.sub(r'<\d{1,2}:\d{2}\.\d{2,3}>', '', text_part).strip()
+                if text_part and len(text_part) > 3:  # Only meaningful text
+                    all_text_lines.append(text_part)
+
+        # If we have more text than timing data, generate estimated timing
+        if len(all_text_lines) > len(timing_data):
+            print(f"  📝 Found {len(all_text_lines)} text lines, but only {len(timing_data)} timing entries")
+
+            # Estimate timing based on typical rap/song pacing
+            # Average: 4-6 words per second, 15-20 seconds per verse
+            total_words = sum(len(line.split()) for line in all_text_lines)
+            estimated_duration = max(180, total_words * 0.5)  # At least 3 minutes
+
+            print(f"  🕐 Estimating {estimated_duration:.0f}s duration for {total_words} words")
+
+            # Generate timing for remaining lines
+            last_timestamp = timing_data[-1].get('timestamp', 0) if timing_data else 0
+            remaining_time = (estimated_duration * 1000) - last_timestamp
+            remaining_lines = len(all_text_lines) - len(timing_data)
+
+            if remaining_lines > 0:
+                time_per_line = remaining_time / remaining_lines
+
+                for i, text_line in enumerate(all_text_lines[len(timing_data):]):
+                    estimated_time = last_timestamp + (i + 1) * time_per_line
+                    timing_data.append({
+                        'timestamp': int(estimated_time),
+                        'time_formatted': format_timestamp(int(estimated_time)),
+                        'text': text_line,
+                        'words': [],
+                        'estimated': True  # Mark as estimated
+                    })
+
+                print(f"  ✓ Added {remaining_lines} estimated timing entries")
+
+        return timing_data
+
+    except Exception as e:
+        print(f"  ✗ Failed to supplement timing data: {e}")
+        return timing_data
+
+def format_timestamp(ms):
+    """Convert milliseconds to MM:SS.mmm format"""
+    minutes = ms // 60000
+    seconds = (ms % 60000) // 1000
+    milliseconds = ms % 1000
+    return f"{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
 def parse_lrc_content(lrc_content):
     """Parse LRC format content into timing data structure"""
     try:
@@ -325,21 +539,50 @@ def parse_lrc_content(lrc_content):
             if not line:
                 continue
 
-            # Match LRC format: [mm:ss.xx] or [mm:ss.xxx] followed by text
-            lrc_match = re.match(r'\[(\d{1,2}):(\d{2})\.(\d{2,3})\]\s*(.*)', line)
+            # Try multiple LRC format patterns
+            text = ""
+            total_ms = 0
 
+            # Standard LRC format: [mm:ss.xx] followed by text
+            lrc_match = re.match(r'\[(\d{1,2}):(\d{2})\.(\d{2,3})\]\s*(.*)', line)
             if lrc_match:
                 minutes = int(lrc_match.group(1))
                 seconds = int(lrc_match.group(2))
-                centiseconds = int(lrc_match.group(3).ljust(3, '0')[:3])  # Normalize to milliseconds
+                centiseconds = int(lrc_match.group(3).ljust(3, '0')[:3])
                 text = lrc_match.group(4).strip()
-
-                # Convert to total milliseconds
                 total_ms = (minutes * 60 * 1000) + (seconds * 1000) + centiseconds
+            else:
+                # Malformed format: <mm:ss.xx> followed by text (or embedded in text)
+                malformed_match = re.search(r'<(\d{1,2}):(\d{2})\.(\d{2,3})>\s*(.*)', line)
+                if malformed_match:
+                    minutes = int(malformed_match.group(1))
+                    seconds = int(malformed_match.group(2))
+                    centiseconds = int(malformed_match.group(3).ljust(3, '0')[:3])
+                    text = malformed_match.group(4).strip()
+                    total_ms = (minutes * 60 * 1000) + (seconds * 1000) + centiseconds
+                else:
+                    # Text with embedded timing markers - extract the text, ignore timing
+                    clean_text = line
+                    # Remove all possible timing marker formats
+                    clean_text = re.sub(r'<\d{1,2}:\d{2}\.\d{2,3}>', '', clean_text)
+                    clean_text = re.sub(r'\[\d{1,2}:\d{2}\.\d{2,3}\]', '', clean_text)
+                    clean_text = re.sub(r'-\d{1,2}:\d{2}\.\d{2,3}', '', clean_text)
+                    clean_text = re.sub(r'<[^>]*>', '', clean_text)  # Remove any other <...> tags
+                    clean_text = clean_text.strip()
 
+                    # Only use text if it contains actual words (not just punctuation/numbers)
+                    if clean_text and len(clean_text) > 3 and re.search(r'[a-zA-Z]', clean_text):
+                        text = clean_text
+                        # Use previous timestamp + estimated time if no timing found
+                        if timing_data:
+                            total_ms = timing_data[-1]['timestamp'] + 3000  # 3 second estimate
+                        else:
+                            total_ms = 0
+
+            if text and total_ms >= 0:
                 timing_data.append({
                     'timestamp': total_ms,
-                    'time_formatted': f"{minutes:02d}:{seconds:02d}.{centiseconds:03d}",
+                    'time_formatted': f"{total_ms//60000:02d}:{(total_ms//1000)%60:02d}.{total_ms%1000:03d}",
                     'text': text,
                     'words': text.split() if text else []
                 })
@@ -977,6 +1220,12 @@ def find_all_rhymes(text, threshold=0.7):
             if (other_word_obj['clean'] != word_obj['clean'] and
                 other_word_obj['clean'] not in used_words and
                 other_word_obj['phones']):
+
+                # Proximity check: Only rhyme if within 8 lines of each other
+                line_distance = abs(other_word_obj['line_index'] - word_obj['line_index'])
+                if line_distance > 8:
+                    # Skip distant rhymes for more natural highlighting
+                    continue
 
                 # Check exact rhymes first
                 if other_word_obj['clean'] in rhyming_words:
