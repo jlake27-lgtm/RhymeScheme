@@ -9,6 +9,11 @@ import os
 from pathlib import Path
 from bs4 import BeautifulSoup
 import syncedlyrics
+import whisper
+import yt_dlp
+import tempfile
+import threading
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -1393,6 +1398,224 @@ def create_syllable_breakdown(original_word, clean_word, rhyme_part, color):
         })
 
     return syllables
+
+# Global variable to store Whisper model (loaded once)
+whisper_model = None
+generation_progress = {}
+
+def load_whisper_model():
+    """Load Whisper model (cached after first load)"""
+    global whisper_model
+    if whisper_model is None:
+        print("🤖 Loading Whisper model (this may take a minute on first run)...")
+        whisper_model = whisper.load_model("small")  # Good balance of speed/accuracy
+        print("✓ Whisper model loaded successfully")
+    return whisper_model
+
+def download_audio_from_youtube(youtube_url, output_dir):
+    """Download audio from YouTube video"""
+    ydl_opts = {
+        'format': 'bestaudio/best',
+        'outtmpl': os.path.join(output_dir, '%(title)s.%(ext)s'),
+        'postprocessors': [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '128',
+        }],
+        'quiet': True,
+        'no_warnings': True
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(youtube_url, download=True)
+            title = info.get('title', 'audio')
+            # Clean filename for safe filesystem access
+            clean_title = re.sub(r'[<>:"/\\|?*]', '_', title)[:50]
+            audio_file = os.path.join(output_dir, f"{clean_title}.mp3")
+            return audio_file
+    except Exception as e:
+        print(f"Error downloading audio: {e}")
+        return None
+
+def generate_timing_with_whisper(audio_file, lyrics_text, task_id):
+    """Generate timing data using Whisper AI"""
+    try:
+        # Update progress
+        generation_progress[task_id] = {"status": "processing", "progress": 0, "message": "Loading Whisper model..."}
+
+        # Load Whisper model
+        model = load_whisper_model()
+
+        generation_progress[task_id] = {"status": "processing", "progress": 20, "message": "Transcribing audio..."}
+
+        # Transcribe audio with word-level timestamps
+        result = model.transcribe(audio_file, word_timestamps=True)
+
+        generation_progress[task_id] = {"status": "processing", "progress": 60, "message": "Aligning with provided lyrics..."}
+
+        # Extract words from the provided lyrics for matching
+        lyrics_words = re.findall(r'\b\w+\b', lyrics_text.lower())
+
+        # Create timing data by matching transcribed words to lyrics
+        timing_data = []
+        whisper_words = []
+
+        # Flatten all words from Whisper segments
+        for segment in result["segments"]:
+            if "words" in segment:
+                for word_info in segment["words"]:
+                    whisper_words.append({
+                        'text': word_info['word'].strip().lower(),
+                        'start': word_info['start'],
+                        'end': word_info['end']
+                    })
+
+        generation_progress[task_id] = {"status": "processing", "progress": 80, "message": "Creating synchronized timing data..."}
+
+        # Match lyrics lines to timing
+        lines = [line.strip() for line in lyrics_text.split('\n') if line.strip()]
+        whisper_word_idx = 0
+
+        for line_idx, line in enumerate(lines):
+            line_words = re.findall(r'\b\w+\b', line.lower())
+            line_start_time = None
+            matched_words = []
+
+            # Find matching words in Whisper output
+            for line_word in line_words:
+                # Look for the word in remaining whisper words
+                found = False
+                for i in range(whisper_word_idx, min(whisper_word_idx + 10, len(whisper_words))):
+                    if i < len(whisper_words):
+                        whisper_word = whisper_words[i]['text']
+                        # Flexible matching (partial match or similar)
+                        if (line_word in whisper_word or
+                            whisper_word in line_word or
+                            whisper_word.startswith(line_word[:3]) if len(line_word) > 3 else False):
+                            if line_start_time is None:
+                                line_start_time = whisper_words[i]['start']
+                            matched_words.append(line_word)
+                            whisper_word_idx = i + 1
+                            found = True
+                            break
+
+                if not found:
+                    # Use previous timing + estimate if no match
+                    if line_start_time is None and timing_data:
+                        line_start_time = timing_data[-1]['timestamp'] / 1000.0 + 3.0
+                    elif line_start_time is None:
+                        line_start_time = line_idx * 3.0  # 3 second fallback
+
+            # Create timing entry
+            if line_start_time is not None:
+                timing_data.append({
+                    'timestamp': int(line_start_time * 1000),
+                    'time_formatted': format_timestamp(int(line_start_time * 1000)),
+                    'text': line,
+                    'words': line.split(),
+                    'generated': True,
+                    'confidence': len(matched_words) / len(line_words) if line_words else 0
+                })
+
+        generation_progress[task_id] = {"status": "completed", "progress": 100, "message": "Timing generation complete!"}
+
+        return timing_data
+
+    except Exception as e:
+        generation_progress[task_id] = {"status": "error", "progress": 0, "message": f"Error: {str(e)}"}
+        print(f"Error generating timing with Whisper: {e}")
+        return None
+
+@app.route('/generate-timing', methods=['POST'])
+def generate_timing():
+    """Generate timing data using Whisper AI"""
+    try:
+        data = request.get_json()
+        youtube_url = data.get('youtube_url', '')
+        lyrics = data.get('lyrics', '')
+        task_id = data.get('task_id', str(int(time.time())))
+
+        if not youtube_url or not lyrics:
+            return jsonify({
+                'success': False,
+                'error': 'YouTube URL and lyrics are required'
+            }), 400
+
+        # Initialize progress tracking
+        generation_progress[task_id] = {"status": "starting", "progress": 0, "message": "Initializing..."}
+
+        # Start background processing
+        def process_timing():
+            try:
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    generation_progress[task_id] = {"status": "processing", "progress": 10, "message": "Downloading audio..."}
+
+                    # Download audio
+                    audio_file = download_audio_from_youtube(youtube_url, temp_dir)
+                    if not audio_file or not os.path.exists(audio_file):
+                        generation_progress[task_id] = {"status": "error", "progress": 0, "message": "Failed to download audio"}
+                        return
+
+                    # Generate timing
+                    timing_data = generate_timing_with_whisper(audio_file, lyrics, task_id)
+
+                    if timing_data:
+                        # Store result in progress dict
+                        generation_progress[task_id]['timing_data'] = timing_data
+                        generation_progress[task_id]['word_count'] = len([item for item in timing_data if item.get('text', '').strip()])
+
+            except Exception as e:
+                generation_progress[task_id] = {"status": "error", "progress": 0, "message": f"Processing error: {str(e)}"}
+
+        # Start processing in background thread
+        thread = threading.Thread(target=process_timing)
+        thread.daemon = True
+        thread.start()
+
+        return jsonify({
+            'success': True,
+            'task_id': task_id,
+            'message': 'Timing generation started'
+        })
+
+    except Exception as e:
+        print(f"Error in generate_timing: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to start timing generation: {str(e)}'
+        }), 500
+
+@app.route('/timing-progress/<task_id>', methods=['GET'])
+def check_timing_progress(task_id):
+    """Check progress of timing generation"""
+    try:
+        progress = generation_progress.get(task_id, {"status": "not_found", "progress": 0, "message": "Task not found"})
+
+        if progress["status"] == "completed" and "timing_data" in progress:
+            # Return the complete result
+            return jsonify({
+                'success': True,
+                'status': 'completed',
+                'progress': 100,
+                'timing_data': progress['timing_data'],
+                'word_count': progress.get('word_count', 0),
+                'provider': 'whisper_ai'
+            })
+        else:
+            # Return progress status
+            return jsonify({
+                'success': progress["status"] != "error",
+                'status': progress["status"],
+                'progress': progress["progress"],
+                'message': progress["message"]
+            })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Failed to check progress: {str(e)}'
+        }), 500
 
 if __name__ == '__main__':
     print("Starting Rhyme Scheme Analyzer server...")

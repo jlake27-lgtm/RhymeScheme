@@ -981,6 +981,69 @@
                 width: 150px;
             }
         }
+
+        /* Whisper AI Progress Indicator */
+        .whisper-btn {
+            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%) !important;
+            color: white !important;
+            margin-left: 10px;
+        }
+
+        .whisper-btn:hover {
+            background: linear-gradient(45deg, #5a6fd8 0%, #6a4190 100%) !important;
+            transform: translateY(-1px);
+        }
+
+        .whisper-progress {
+            margin: 20px 0;
+            padding: 20px;
+            background: var(--container-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .progress-container {
+            text-align: center;
+        }
+
+        .progress-bar {
+            width: 100%;
+            max-width: 400px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px auto;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .progress-text {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: var(--text-color);
+        }
+
+        .progress-details {
+            font-size: 14px;
+            color: var(--subtitle-color);
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -1013,6 +1076,18 @@
                     <input type="text" id="timedArtistInput" placeholder="Artist name" />
                     <input type="text" id="timedSongInput" placeholder="Song title" />
                     <button class="search-btn" id="timedSearchBtn" onclick="searchTimedLyrics()">Get Timed Lyrics</button>
+                    <button class="search-btn whisper-btn" id="generateTimingBtn" onclick="generateTimingWithWhisper()">🤖 Generate Timing (AI)</button>
+                </div>
+
+                <!-- Whisper Progress Indicator -->
+                <div class="whisper-progress" id="whisperProgress" style="display: none;">
+                    <div class="progress-container">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-text" id="progressText">Initializing...</div>
+                        <div class="progress-details" id="progressDetails">This may take 1-2 minutes for AI processing</div>
+                    </div>
                 </div>
                 <div class="audio-controls" id="audioControls" style="display: none;">
                     <div class="audio-method-selector">
@@ -2393,6 +2468,138 @@ The magnificent different president, evident hesitant</textarea>
             const toggle = document.querySelector('.theme-toggle');
             toggle.textContent = savedTheme === 'dark' ? 'Light Mode' : 'Dark Mode';
         });
+
+        // Whisper AI Timing Generation
+        async function generateTimingWithWhisper() {
+            const artist = document.getElementById('timedArtistInput').value.trim();
+            const song = document.getElementById('timedSongInput').value.trim();
+            const lyrics = document.getElementById('input').value.trim();
+            const btn = document.getElementById('generateTimingBtn');
+            const progressDiv = document.getElementById('whisperProgress');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const progressDetails = document.getElementById('progressDetails');
+
+            if (!artist || !song) {
+                showError('Please enter both artist name and song title for AI timing generation.');
+                return;
+            }
+
+            if (!lyrics) {
+                showError('Please enter lyrics in the text area before generating timing.');
+                return;
+            }
+
+            try {
+                btn.disabled = true;
+                btn.textContent = '🤖 Generating...';
+                progressDiv.style.display = 'block';
+
+                // First, search for the YouTube video
+                console.log('Searching for YouTube video...');
+                const audioResponse = await fetch('/search-audio', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({artist, song})
+                });
+
+                const audioData = await audioResponse.json();
+
+                if (!audioData.success || !audioData.video_id) {
+                    throw new Error('Could not find YouTube video for this song');
+                }
+
+                const youtube_url = `https://www.youtube.com/watch?v=${audioData.video_id}`;
+                console.log('Found YouTube video:', youtube_url);
+
+                // Start timing generation
+                const task_id = `timing_${Date.now()}`;
+                console.log('Starting Whisper timing generation...');
+
+                const generateResponse = await fetch('/generate-timing', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        youtube_url: youtube_url,
+                        lyrics: lyrics,
+                        task_id: task_id
+                    })
+                });
+
+                const generateData = await generateResponse.json();
+
+                if (!generateData.success) {
+                    throw new Error(generateData.error || 'Failed to start timing generation');
+                }
+
+                // Poll for progress
+                console.log('Polling for progress...');
+                await pollTimingProgress(task_id, progressFill, progressText, progressDetails);
+
+                btn.disabled = false;
+                btn.textContent = '🤖 Generate Timing (AI)';
+                progressDiv.style.display = 'none';
+
+            } catch (error) {
+                console.error('Error generating timing with Whisper:', error);
+                showError(`Failed to generate timing: ${error.message}`);
+
+                btn.disabled = false;
+                btn.textContent = '🤖 Generate Timing (AI)';
+                progressDiv.style.display = 'none';
+            }
+        }
+
+        async function pollTimingProgress(task_id, progressFill, progressText, progressDetails) {
+            const maxAttempts = 120; // 2 minutes max polling
+            let attempts = 0;
+
+            const poll = async () => {
+                try {
+                    const response = await fetch(`/timing-progress/${task_id}`);
+                    const data = await response.json();
+
+                    if (!data.success && data.status !== 'processing') {
+                        throw new Error(data.message || 'Timing generation failed');
+                    }
+
+                    // Update progress display
+                    progressFill.style.width = `${data.progress || 0}%`;
+                    progressText.textContent = data.message || 'Processing...';
+
+                    if (data.status === 'completed' && data.timing_data) {
+                        console.log('✓ Timing generation completed');
+
+                        // Store the timing data globally
+                        window.currentTimingData = data.timing_data;
+
+                        // Update UI to show timing data is ready
+                        progressText.textContent = `✓ Generated ${data.word_count} timing entries`;
+                        progressDetails.textContent = 'Ready for sync presentation!';
+
+                        // Enable audio controls
+                        document.getElementById('audioControls').style.display = 'block';
+                        document.getElementById('syncPlayBtn').disabled = false;
+
+                        return; // Success - stop polling
+                    }
+
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        throw new Error('Timing generation timed out');
+                    }
+
+                    // Continue polling
+                    setTimeout(poll, 1000); // Poll every second
+
+                } catch (error) {
+                    console.error('Polling error:', error);
+                    throw error;
+                }
+            };
+
+            await poll();
+        }
     </script>
 </body>
 </html>
